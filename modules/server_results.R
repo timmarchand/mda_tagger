@@ -164,6 +164,62 @@ resultsServer <- function(id, processing_module) {
 
       plot_biber_comparison_all(results_data(), max_texts = 12)
     })
+    # Aggregated data reactive
+    aggregated_data <- reactive({
+      req(results_data())
+      aggregate_by_metadata(results_data())
+    })
+
+    # Aggregated Table
+    output$aggregated_table <- DT::renderDataTable({
+      req(aggregated_data())
+
+      aggregated_data() %>%
+        DT::datatable(
+          options = list(
+            pageLength = 10,
+            scrollX = TRUE
+          ),
+          rownames = FALSE,
+          colnames = c(
+            "Category" = "metadata",
+            "N Texts" = "n_texts",
+            "Avg Words" = "avg_words",
+            "D1" = "Dimension1",
+            "D2" = "Dimension2",
+            "D3" = "Dimension3",
+            "D4" = "Dimension4",
+            "D5" = "Dimension5",
+            "Most Common Type" = "most_common_type"
+          )
+        ) %>%
+        DT::formatRound(columns = c("Dimension1", "Dimension2", "Dimension3",
+                                    "Dimension4", "Dimension5"), digits = 2)
+    })
+
+    # Aggregated Dimension Plot
+    output$aggregated_dimension_plot <- renderPlotly({
+      req(aggregated_data())
+
+      plot_aggregated_dimensions(aggregated_data(), interactive = TRUE)
+    })
+
+    # Update category selector for Biber comparison
+    observe({
+      req(aggregated_data())
+      choices <- setNames(aggregated_data()$metadata, aggregated_data()$metadata)
+      updateSelectInput(session, "biber_category_select", choices = choices)
+    })
+
+    # Biber comparison for category
+    output$biber_category_plot <- renderPlot({
+      req(aggregated_data(), input$biber_category_select)
+
+      plot_biber_comparison_aggregated(
+        aggregated_data(),
+        category_selected = input$biber_category_select
+      )
+    })
 
     # Download Handler ----
     output$download_results <- downloadHandler(

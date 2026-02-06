@@ -370,3 +370,144 @@ plot_biber_comparison_all <- function(results_data, max_texts = 12) {
 
   return(p)
 }
+
+
+#' Aggregate results by metadata category
+#'
+#' @param results_data Tibble with dimension scores and metadata
+#' @return Tibble with mean dimension scores per metadata category
+#' @export
+aggregate_by_metadata <- function(results_data) {
+
+  results_data %>%
+    group_by(metadata) %>%
+    summarise(
+      n_texts = n(),
+      avg_words = round(mean(n_words, na.rm = TRUE), 0),
+      Dimension1 = round(mean(Dimension1, na.rm = TRUE), 2),
+      Dimension2 = round(mean(Dimension2, na.rm = TRUE), 2),
+      Dimension3 = round(mean(Dimension3, na.rm = TRUE), 2),
+      Dimension4 = round(mean(Dimension4, na.rm = TRUE), 2),
+      Dimension5 = round(mean(Dimension5, na.rm = TRUE), 2),
+      most_common_type = names(sort(table(closest_text_type), decreasing = TRUE))[1],
+      .groups = "drop"
+    )
+}
+
+
+#' Plot aggregated dimension scores by metadata
+#'
+#' @param aggregated_data Output from aggregate_by_metadata()
+#' @param interactive Return interactive plotly plot (default: TRUE)
+#' @return ggplot2 or plotly object
+#' @export
+plot_aggregated_dimensions <- function(aggregated_data, interactive = TRUE) {
+
+  # Reshape to long format
+  plot_data <- aggregated_data %>%
+    select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+    pivot_longer(
+      cols = starts_with("Dimension"),
+      names_to = "dimension",
+      values_to = "score"
+    ) %>%
+    mutate(dimension = gsub("Dimension", "D", dimension))
+
+  # Create plot
+  p <- ggplot(plot_data, aes(x = dimension, y = score, color = metadata, group = metadata)) +
+    geom_line(linewidth = 1.2) +
+    geom_point(size = 3) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    theme_minimal() +
+    labs(
+      title = "Average Dimension Scores by Category",
+      x = "Dimension",
+      y = "Average Score",
+      color = "Category"
+    ) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      legend.position = "right"
+    )
+
+  if (interactive) {
+    p <- ggplotly(p, tooltip = c("metadata", "dimension", "score"))
+  }
+
+  return(p)
+}
+
+
+#' Plot Biber comparison for aggregated metadata
+#'
+#' @param aggregated_data Output from aggregate_by_metadata()
+#' @param category_selected Which category to compare (default: first)
+#' @return ggplot object
+#' @export
+plot_biber_comparison_aggregated <- function(aggregated_data, category_selected = NULL) {
+
+  # Select category
+  if (is.null(category_selected)) {
+    category_selected <- aggregated_data$metadata[1]
+  }
+
+  # Get Biber reference data
+  biber_ref <- get_biber_reference()
+
+  # Prepare category data
+  category_data <- aggregated_data %>%
+    filter(metadata == category_selected) %>%
+    select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+    pivot_longer(
+      cols = starts_with("Dimension"),
+      names_to = "dimension",
+      values_to = "value"
+    ) %>%
+    mutate(
+      corpus = "Your Category",
+      genre = paste(metadata, "(avg)")
+    )
+
+  # Combine
+  combined <- bind_rows(
+    biber_ref %>% select(corpus, genre, dimension, value),
+    category_data %>% select(corpus, genre, dimension, value)
+  )
+
+  # Create plot
+  p <- combined %>%
+    ggplot(aes(x = 0, y = value)) +
+    geom_text(
+      data = filter(combined, corpus == "Biber"),
+      aes(label = genre),
+      hjust = 1.1,
+      size = 2.5,
+      color = "gray30"
+    ) +
+    geom_text(
+      data = filter(combined, corpus == "Your Category"),
+      aes(label = genre),
+      hjust = -0.1,
+      size = 3.5,
+      color = "#3498DB",
+      fontface = "bold"
+    ) +
+    geom_vline(xintercept = 0, linewidth = 1, color = "gray50") +
+    facet_wrap(~ dimension, scales = "free_y", ncol = 3) +
+    labs(
+      title = paste("Biber Genres vs", category_selected, "(Average)"),
+      y = "Score",
+      x = NULL
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      strip.background = element_rect(fill = "gray70"),
+      strip.text = element_text(face = "bold", size = 11)
+    )
+
+  return(p)
+}

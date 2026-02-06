@@ -180,6 +180,49 @@ resultsUI <- function(id) {
       )
     ),
 
+    # Tab 7: By Category (Aggregated)
+    tabPanel(
+      "By Category",
+      br(),
+      h4("📊 Aggregated Results by Metadata Category"),
+      p("View average dimension scores for each category/genre in your corpus."),
+
+      fluidRow(
+        # Aggregated table
+        column(12,
+               h5("Category Summary Table"),
+               DT::dataTableOutput(ns("aggregated_table")),
+               br()
+        )
+      ),
+
+      fluidRow(
+        # Aggregated dimension plot
+        column(12,
+               h5("Average Dimension Scores by Category"),
+               plotlyOutput(ns("aggregated_dimension_plot"), height = "400px"),
+               br()
+        )
+      ),
+
+      fluidRow(
+        # Biber comparison for category
+        column(6,
+               selectInput(
+                 ns("biber_category_select"),
+                 "Compare category to Biber:",
+                 choices = NULL
+               )
+        )
+      ),
+
+      fluidRow(
+        column(12,
+               plotOutput(ns("biber_category_plot"), height = "600px")
+        )
+      )
+    ),
+
     # Interpretation guide
     fluidRow(
       box(
