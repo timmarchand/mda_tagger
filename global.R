@@ -49,3 +49,13 @@ if (file.exists("data/biber_base.rds")) {
 } else {
   stop("❌ data/biber_base.rds not found. Run data/create_biber_base.R first.")
 }
+
+# ==== Source Functions ====
+cat("🔧 Loading functions...\n")
+
+source("R/05_file_helpers.R", local = TRUE)
+cat("   ✓ File helpers loaded\n")
+
+# More functions will be sourced here as we add them
+# source("R/01_utils.R", local = TRUE)
+# source("R/02_pipeline.R", local = TRUE)
