@@ -1,0 +1,384 @@
+# =============================================================================
+# modules/server_data_input.R
+# Data Input Server Module
+# =============================================================================
+
+#' Data Input Server Module
+#'
+#' @param id Module namespace ID
+#' @return List of reactive values
+dataInputServer <- function(id) {
+  moduleServer(id, function(input, output, session) {
+
+    # Reactive Values ----
+    corpus_metadata <- reactiveVal(NULL)
+    data_confirmed <- reactiveVal(FALSE)
+
+    # Data Ingestion ----
+    uploaded_data <- reactive({
+
+      # Paste text
+      if (input$input_type == "paste") {
+        req(input$pasted_text)
+        return(process_pasted_text(input$pasted_text))
+      }
+
+      # Single file upload
+      if (input$input_type == "file") {
+        req(input$upload_csv)
+        result <- read_uploaded_file(
+          input$upload_csv,
+          skip_rows = input$skip_rows %||% 0
+        )
+        return(result)
+      }
+
+      # Corpus upload
+      if (input$input_type == "corpus") {
+        req(input$upload_corpus)
+        metadata_assignments <- corpus_metadata()
+        return(read_corpus_files(input$upload_corpus, metadata_assignments))
+      }
+
+      return(NULL)
+    })
+
+    # CSV Column Selection UI ----
+    output$column_selection_ui <- renderUI({
+      if (input$input_type != "file") return(NULL)
+      if (is.null(uploaded_data())) return(NULL)
+      if (uploaded_data()$type != "csv") return(NULL)
+
+      columns <- names(uploaded_data()$content)
+      df <- uploaded_data()$content
+
+      # Count unique values per column
+      column_info <- sapply(columns, function(col) {
+        length(unique(df[[col]]))
+      })
+
+      high_cardinality_cols <- names(column_info)[column_info > 20]
+
+      tagList(
+        hr(),
+        h5("📋 Column Selection"),
+        p("Choose which columns contain your text and metadata:"),
+
+        selectInput(
+          session$ns("text_column"),
+          "Text Column:",
+          choices = columns,
+          selected = columns[1]
+        ),
+
+        selectInput(
+          session$ns("meta_column"),
+          "Metadata Column(s) (optional):",
+          choices = NULL,
+          multiple = TRUE,
+          selected = NULL
+        ),
+
+        if (length(high_cardinality_cols) > 0) {
+          div(
+            style = "margin-top: 10px; padding: 10px; background-color: #fff3cd; border-radius: 4px;",
+            HTML(paste0(
+              "<strong>⚠️ Performance Warning:</strong><br/>",
+              "These columns have >20 unique values: ",
+              "<strong>", paste(high_cardinality_cols, collapse = ", "), "</strong><br/>",
+              "Consider using columns with fewer categories."
+            ))
+          )
+        }
+      )
+    })
+
+    # Update meta column choices based on text column selection
+    observe({
+      if (input$input_type != "file") return()
+      if (is.null(uploaded_data())) return()
+      if (uploaded_data()$type != "csv") return()
+      if (is.null(input$text_column)) return()
+
+      all_columns <- names(uploaded_data()$content)
+      available_meta_columns <- setdiff(all_columns, input$text_column)
+
+      if (length(available_meta_columns) > 0) {
+        df <- uploaded_data()$content
+        meta_column_info <- sapply(available_meta_columns, function(col) {
+          length(unique(df[[col]]))
+        })
+
+        meta_choices <- setNames(
+          available_meta_columns,
+          paste0(available_meta_columns, " (", meta_column_info, " unique)")
+        )
+
+        updateSelectInput(session, "meta_column", choices = meta_choices)
+      } else {
+        updateSelectInput(session, "meta_column", choices = NULL)
+      }
+    })
+
+    # Corpus Metadata UI ----
+    output$corpus_metadata_container <- renderUI({
+      if (input$input_type != "corpus") return(NULL)
+      if (is.null(input$upload_corpus)) return(NULL)
+      if (nrow(input$upload_corpus) == 0) return(NULL)
+
+      files <- input$upload_corpus
+
+      tagList(
+        br(),
+        div(
+          style = "border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #f9f9f9;",
+
+          h5("📝 Metadata Assignment"),
+          p("Assign category labels to your files for corpus analysis:"),
+
+          tags$ul(
+            tags$li("Use the same label for multiple files (e.g., 'Academic', 'News')"),
+            tags$li("Create different categories for register comparison"),
+            tags$li("Labels will be used for filtering and grouping")
+          ),
+
+          # Quick assignment tools
+          div(
+            style = "margin-bottom: 15px; padding: 10px; background-color: #e8f4f8; border-radius: 3px;",
+            h6("🚀 Quick Assignment Tools:"),
+
+            fluidRow(
+              column(4,
+                textInput(session$ns("bulk_meta_label"),
+                         "Bulk Label:",
+                         placeholder = "e.g., Academic, News")
+              ),
+              column(4,
+                numericInput(session$ns("bulk_start"),
+                           "From file #:",
+                           value = 1, min = 1, step = 1)
+              ),
+              column(4,
+                numericInput(session$ns("bulk_end"),
+                           "To file #:",
+                           value = nrow(files), min = 1, step = 1)
+              )
+            ),
+
+            div(style = "text-align: center; margin-top: 10px;",
+              actionButton(session$ns("apply_bulk"),
+                          "Apply to Range",
+                          class = "btn-info btn-sm"),
+              actionButton(session$ns("apply_all"),
+                          "Apply to All",
+                          class = "btn-warning btn-sm")
+            )
+          ),
+
+          # Individual file assignments
+          h6("📁 Individual File Assignments:"),
+          div(
+            style = "max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 3px; background-color: white;",
+
+            lapply(1:nrow(files), function(i) {
+              filename_base <- tools::file_path_sans_ext(files$name[i])
+
+              div(
+                style = "margin-bottom: 8px; padding: 8px; border: 1px solid #e0e0e0; border-radius: 3px;",
+                fluidRow(
+                  column(1,
+                    div(style = "text-align: center; font-weight: bold; color: #666; padding-top: 5px;",
+                        paste0("#", i))
+                  ),
+                  column(5,
+                    div(style = "font-size: 13px; color: #333; padding-top: 5px; word-break: break-all;",
+                        files$name[i])
+                  ),
+                  column(6,
+                    textInput(
+                      session$ns(paste0("meta_", i)),
+                      label = NULL,
+                      value = filename_base,
+                      placeholder = "Enter category"
+                    )
+                  )
+                )
+              )
+            })
+          ),
+
+          br(),
+          div(style = "text-align: center;",
+            actionButton(session$ns("update_metadata"),
+                        "✅ Confirm Metadata",
+                        class = "btn-success"),
+            tags$span(style = "margin: 0 10px;"),
+            actionButton(session$ns("reset_metadata"),
+                        "🔄 Reset to Filenames",
+                        class = "btn-outline-secondary btn-sm")
+          )
+        )
+      )
+    })
+
+    # Metadata Assignment Observers ----
+    observeEvent(input$apply_bulk, {
+      req(input$upload_corpus, input$bulk_meta_label, input$bulk_start, input$bulk_end)
+
+      if (nchar(trimws(input$bulk_meta_label)) == 0) {
+        showNotification("Please enter a label", type = "warning")
+        return()
+      }
+
+      files <- input$upload_corpus
+      start_idx <- max(1, min(input$bulk_start, nrow(files)))
+      end_idx <- max(start_idx, min(input$bulk_end, nrow(files)))
+
+      for (i in start_idx:end_idx) {
+        updateTextInput(session, paste0("meta_", i),
+                       value = trimws(input$bulk_meta_label))
+      }
+
+      showNotification(
+        paste("Applied to files", start_idx, "-", end_idx),
+        type = "message"
+      )
+    })
+
+    observeEvent(input$apply_all, {
+      req(input$upload_corpus, input$bulk_meta_label)
+
+      if (nchar(trimws(input$bulk_meta_label)) == 0) {
+        showNotification("Please enter a label", type = "warning")
+        return()
+      }
+
+      files <- input$upload_corpus
+      for (i in 1:nrow(files)) {
+        updateTextInput(session, paste0("meta_", i),
+                       value = trimws(input$bulk_meta_label))
+      }
+
+      showNotification(
+        paste("Applied to all", nrow(files), "files"),
+        type = "message"
+      )
+    })
+
+    observeEvent(input$reset_metadata, {
+      req(input$upload_corpus)
+      files <- input$upload_corpus
+      for (i in 1:nrow(files)) {
+        filename_base <- tools::file_path_sans_ext(files$name[i])
+        updateTextInput(session, paste0("meta_", i), value = filename_base)
+      }
+      showNotification("Reset to filenames", type = "message")
+    })
+
+    observeEvent(input$update_metadata, {
+      req(input$upload_corpus)
+      files <- input$upload_corpus
+      assignments <- character(nrow(files))
+
+      for (i in 1:nrow(files)) {
+        meta_value <- input[[paste0("meta_", i)]]
+        if (!is.null(meta_value) && nchar(trimws(meta_value)) > 0) {
+          assignments[i] <- trimws(meta_value)
+        } else {
+          assignments[i] <- tools::file_path_sans_ext(files$name[i])
+        }
+      }
+
+      corpus_metadata(assignments)
+
+      assignment_summary <- table(assignments)
+      summary_text <- paste(
+        "Metadata confirmed!",
+        paste(names(assignment_summary), "(", assignment_summary, ")", collapse = ", ")
+      )
+      showNotification(summary_text, type = "message", duration = 5)
+    })
+
+    # Final Data Assembly ----
+    selected_text_and_meta <- reactive({
+      req(uploaded_data())
+
+      # For paste, txt, corpus - already have everything
+      if (uploaded_data()$type %in% c("paste", "txt", "corpus")) {
+        return(list(
+          text = uploaded_data()$content,
+          meta = uploaded_data()$metadata,
+          doc_ids = uploaded_data()$doc_ids
+        ))
+      }
+
+      # For CSV - need column selection
+      if (uploaded_data()$type == "csv") {
+        req(input$text_column)
+        df <- uploaded_data()$content
+        text_data <- as.character(df[[input$text_column]])
+
+        # Generate doc_ids
+        doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
+
+        # Get metadata
+        meta_data <- if (!is.null(input$meta_column) && length(input$meta_column) > 0) {
+          apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
+        } else {
+          rep("unknown", length(text_data))
+        }
+
+        return(list(
+          text = text_data,
+          meta = meta_data,
+          doc_ids = doc_ids
+        ))
+      }
+    })
+
+    # Data Summary Output ----
+    output$data_available <- reactive({
+      !is.null(selected_text_and_meta())
+    })
+    outputOptions(output, "data_available", suspendWhenHidden = FALSE)
+
+    output$data_summary <- renderText({
+      req(selected_text_and_meta())
+
+      data <- selected_text_and_meta()
+      summary <- summarize_texts(data$text, data$meta)
+
+      paste0(
+        "📊 DATA SUMMARY\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        "Documents:      ", summary$n_texts, "\n",
+        "Total words:    ", format(summary$total_words, big.mark = ","), "\n",
+        "Mean words:     ", summary$mean_words, "\n",
+        "Range:          ", summary$min_words, " - ", summary$max_words, " words\n",
+        if (!is.null(data$meta) && length(unique(data$meta)) > 1) {
+          paste0("Categories:     ", summary$n_categories, " (", summary$categories, ")\n")
+        } else "",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        "✅ Data ready for processing"
+      )
+    })
+
+    # Confirm Data Button ----
+    observeEvent(input$confirm_data, {
+      req(selected_text_and_meta())
+      data_confirmed(TRUE)
+      showNotification(
+        "Data confirmed! You can now proceed to processing.",
+        type = "message",
+        duration = 3
+      )
+    })
+
+    # Module Returns ----
+    return(list(
+      uploaded_data = uploaded_data,
+      selected_text_and_meta = selected_text_and_meta,
+      data_confirmed = data_confirmed
+    ))
+  })
+}

@@ -56,6 +56,10 @@ cat("🔧 Loading functions...\n")
 source("R/05_file_helpers.R", local = TRUE)
 cat("   ✓ File helpers loaded\n")
 
-# More functions will be sourced here as we add them
-# source("R/01_utils.R", local = TRUE)
-# source("R/02_pipeline.R", local = TRUE)
+# ==== Source Modules ====
+cat("📦 Loading Shiny modules...\n")
+
+source("modules/ui_data_input.R", local = TRUE)
+source("modules/server_data_input.R", local = TRUE)
+
+cat("   ✓ Data input module loaded\n")
