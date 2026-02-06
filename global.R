@@ -56,10 +56,39 @@ cat("🔧 Loading functions...\n")
 source("R/05_file_helpers.R", local = TRUE)
 cat("   ✓ File helpers loaded\n")
 
+source("R/01_utils.R", local = TRUE)
+cat("   ✓ Core tagging functions loaded\n")
+
+source("R/02_pipeline.R", local = TRUE)
+cat("   ✓ Pipeline functions loaded\n")
+
+source("R/03_analysis.R", local = TRUE)
+cat("   ✓ Analysis functions loaded\n")
+
+# ==== Initialize UDPipe Model ====
+cat("📦 Initializing UDPipe model...\n")
+
+model_file <- "english-ewt-ud-2.5-191206.udpipe"
+
+if (!file.exists(model_file)) {
+  cat("   📥 Downloading model (first time only, ~20MB)...\n")
+  udpipe::udpipe_download_model(language = "english-ewt", model_dir = ".")
+  cat("   ✓ Downloaded\n")
+}
+
+cat("   Loading model...\n")
+udmodel <- udpipe::udpipe_load_model(model_file)
+cat("   ✓ Model ready\n")
+
 # ==== Source Modules ====
 cat("📦 Loading Shiny modules...\n")
 
 source("modules/ui_data_input.R", local = TRUE)
 source("modules/server_data_input.R", local = TRUE)
+cat("   ✓ Data input module loaded\n")
+
+source("modules/ui_processing.R", local = TRUE)
+source("modules/server_processing.R", local = TRUE)
+cat("   ✓ Processing module loaded\n")
 
 cat("   ✓ Data input module loaded\n")

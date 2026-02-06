@@ -58,16 +58,9 @@ ui <- dashboardPage(
       tabItem(
         tabName = "process",
         h2("⚙️ Processing & Tagging"),
-        p("Process uploaded texts and extract linguistic features."),
+        p("POS tag your texts and extract linguistic features for MDA."),
         br(),
-        box(
-          title = "Processing",
-          width = 12,
-          status = "warning",
-          p("Processing module coming soon...",
-            class = "text-muted",
-            style = "text-align: center; padding: 40px;")
-        )
+        processingUI("processing")
       ),
 
       # Tab 3: Results ----
@@ -106,10 +99,14 @@ ui <- dashboardPage(
 )
 
 # Server ----
+# Server ----
 server <- function(input, output, session) {
 
   # Call data input module
   data_module <- dataInputServer("data_input")
+
+  # Call processing module
+  processing_module <- processingServer("processing", data_module)
 
   # Monitor when data is confirmed
   observe({
@@ -131,9 +128,14 @@ server <- function(input, output, session) {
     }
   })
 
-  # Future: Processing module will go here
-  # Future: Results module will go here
-  # Future: Export module will go here
+  # Monitor processing completion
+  observe({
+    result <- processing_module()
+    if (!is.null(result) && result$is_complete) {
+      cat("\n✅ Processing complete!\n")
+      cat("  Processed:", nrow(result$processed_data), "texts\n")
+    }
+  })
 
 }
 
