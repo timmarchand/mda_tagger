@@ -165,9 +165,114 @@ resultsServer <- function(id, processing_module) {
       plot_biber_comparison_all(results_data(), max_texts = 12)
     })
     # Aggregated data reactive
+    # Aggregated data reactive
     aggregated_data <- reactive({
       req(results_data())
       aggregate_by_metadata(results_data())
+    })
+
+    # Aggregated Table
+    # Aggregated Table
+    output$aggregated_table <- DT::renderDataTable({
+      req(aggregated_data())
+
+      aggregated_data() %>%
+        rename(
+          Category = metadata,
+          `N Texts` = n_texts,
+          `Avg Words` = avg_words,
+          D1 = Dimension1,
+          D2 = Dimension2,
+          D3 = Dimension3,
+          D4 = Dimension4,
+          D5 = Dimension5,
+          `Most Common Type` = most_common_type
+        ) %>%
+        DT::datatable(
+          options = list(
+            pageLength = 10,
+            scrollX = TRUE
+          ),
+          rownames = FALSE
+        ) %>%
+        DT::formatRound(columns = c("D1", "D2", "D3", "D4", "D5"), digits = 2)
+    })
+
+    # Update category selectors
+    observe({
+      req(aggregated_data())
+      all_categories <- aggregated_data()$metadata
+
+      updateSelectInput(session, "categories_to_compare",
+                        choices = all_categories,
+                        selected = all_categories)
+
+      updateSelectInput(session, "biber_categories_select",
+                        choices = all_categories,
+                        selected = all_categories[1])
+    })
+
+    # Aggregated Dimension Plot
+    output$aggregated_dimension_plot <- renderPlotly({
+      req(aggregated_data(), input$categories_to_compare)
+
+      # Filter to selected categories
+      plot_data_agg <- aggregated_data() %>%
+        filter(metadata %in% input$categories_to_compare)
+
+      if (input$show_individual_docs) {
+        # Show aggregated lines + individual points
+        plot_data_ind <- results_data() %>%
+          filter(metadata %in% input$categories_to_compare)
+
+        plot_aggregated_dimensions_with_docs(
+          plot_data_agg,
+          plot_data_ind,
+          interactive = TRUE
+        )
+      } else {
+        # Show only aggregated lines
+        plot_aggregated_dimensions(plot_data_agg, interactive = TRUE)
+      }
+    })
+
+    # Update document selector for Biber comparison
+    observe({
+      req(results_data())
+      all_docs <- results_data()$doc_id
+      updateSelectInput(session, "biber_doc_select",
+                        choices = all_docs,
+                        selected = all_docs[1])
+    })
+
+    # Biber Comparison Plot (multiple documents)
+    output$biber_comparison_plot <- renderPlot({
+      req(results_data(), input$biber_doc_select)
+
+      # Limit to 10 documents
+      selected_docs <- head(input$biber_doc_select, 10)
+
+      if (length(selected_docs) == 0) return(NULL)
+
+      plot_biber_comparison_multiple(
+        results_data(),
+        doc_ids_selected = selected_docs
+      )
+    })
+
+    # Biber comparison for categories (multiple)
+    output$biber_category_plot <- renderPlot({
+      req(aggregated_data(), input$biber_categories_select)
+
+      # Limit to 10 categories
+      selected_cats <- head(input$biber_categories_select, 10)
+
+      if (length(selected_cats) == 0) return(NULL)
+
+      plot_biber_comparison_aggregated_multiple(
+        aggregated_data(),
+        categories_selected = selected_cats
+      )
     })
 
     # Aggregated Table

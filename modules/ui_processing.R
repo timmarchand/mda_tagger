@@ -74,7 +74,7 @@ processingUI <- function(id) {
         numericInput(
           ns("normalize_per"),
           "Normalize per N words:",
-          value = 1000,
+          value = 100,
           min = 100,
           max = 10000,
           step = 100

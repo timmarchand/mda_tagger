@@ -42,7 +42,7 @@ resultsUI <- function(id) {
             DT::dataTableOutput(ns("results_table"))
           ),
 
-          # Tab 2: Dimension Plots
+          # Tab 2: Dimension Plots ----
           tabPanel(
             "Dimension Scores",
             br(),
@@ -66,7 +66,7 @@ resultsUI <- function(id) {
             plotlyOutput(ns("dimension_plot"), height = "500px")
           ),
 
-          # Tab 3: Text Types
+          # Tab 3: Text Types ----
           tabPanel(
             "Text Types",
             br(),
@@ -101,7 +101,7 @@ resultsUI <- function(id) {
             )
           ),
 
-          # Tab 4: Scatter Plots
+          # Tab 4: Scatter Plots ----
           tabPanel(
             "2D Comparison",
             br(),
@@ -134,7 +134,7 @@ resultsUI <- function(id) {
             plotlyOutput(ns("scatter_plot"), height = "500px")
           ),
 
-          # Tab 5: Summary Statistics
+          # Tab 5: Summary Statistics ----
           tabPanel(
             "Summary Statistics",
             br(),
@@ -150,7 +150,7 @@ resultsUI <- function(id) {
       )
     ),
 
-    # Tab 6: Biber Comparison
+    # Tab 6: Biber Comparison ----
     tabPanel(
       "Biber Comparison",
       br(),
@@ -158,8 +158,9 @@ resultsUI <- function(id) {
         column(6,
                selectInput(
                  ns("biber_doc_select"),
-                 "Select document to compare:",
-                 choices = NULL
+                 "Select documents to compare (up to 10):",
+                 choices = NULL,
+                 multiple = TRUE
                )
         ),
         column(6,
@@ -180,7 +181,7 @@ resultsUI <- function(id) {
       )
     ),
 
-    # Tab 7: By Category (Aggregated)
+    # Tab 7: By Category (Aggregated) ----
     tabPanel(
       "By Category",
       br(),
@@ -198,20 +199,37 @@ resultsUI <- function(id) {
 
       fluidRow(
         # Aggregated dimension plot
-        column(12,
+        column(8,
                h5("Average Dimension Scores by Category"),
-               plotlyOutput(ns("aggregated_dimension_plot"), height = "400px"),
-               br()
+               plotlyOutput(ns("aggregated_dimension_plot"), height = "500px")
+        ),
+        column(4,
+               checkboxInput(
+                 ns("show_individual_docs"),
+                 "Show individual documents",
+                 value = FALSE
+               ),
+               br(),
+               selectInput(
+                 ns("categories_to_compare"),
+                 "Select categories to display (up to 10):",
+                 choices = NULL,
+                 multiple = TRUE
+               )
         )
       ),
 
+      hr(),
+
+      h5("Compare Category to Biber Reference"),
+
       fluidRow(
-        # Biber comparison for category
         column(6,
                selectInput(
-                 ns("biber_category_select"),
-                 "Compare category to Biber:",
-                 choices = NULL
+                 ns("biber_categories_select"),
+                 "Select categories to compare (up to 10):",
+                 choices = NULL,
+                 multiple = TRUE
                )
         )
       ),
@@ -222,8 +240,7 @@ resultsUI <- function(id) {
         )
       )
     ),
-
-    # Interpretation guide
+    # Interpretation guide ----
     fluidRow(
       box(
         title = "📖 Dimension Interpretations",

@@ -510,4 +510,231 @@ plot_biber_comparison_aggregated <- function(aggregated_data, category_selected 
     )
 
   return(p)
+
+  #' Plot aggregated dimensions with individual documents
+  #'
+  #' @param aggregated_data Aggregated data by metadata
+  #' @param individual_data Full results data with individual docs
+  #' @param interactive Return interactive plotly plot
+  #' @return ggplot2 or plotly object
+  #' @export
+  plot_aggregated_dimensions_with_docs <- function(aggregated_data,
+                                                   individual_data,
+                                                   interactive = TRUE) {
+
+    # Prepare aggregated data (lines)
+    agg_long <- aggregated_data %>%
+      select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+      pivot_longer(
+        cols = starts_with("Dimension"),
+        names_to = "dimension",
+        values_to = "score"
+      ) %>%
+      mutate(
+        dimension = gsub("Dimension", "D", dimension),
+        type = "average"
+      )
+
+    # Prepare individual data (points)
+    ind_long <- individual_data %>%
+      select(doc_id, metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+      pivot_longer(
+        cols = starts_with("Dimension"),
+        names_to = "dimension",
+        values_to = "score"
+      ) %>%
+      mutate(
+        dimension = gsub("Dimension", "D", dimension),
+        type = "individual"
+      )
+
+    # Create plot
+    p <- ggplot() +
+      # Individual points
+      geom_point(
+        data = ind_long,
+        aes(x = dimension, y = score, color = metadata, text = doc_id),
+        alpha = 0.3,
+        size = 2
+      ) +
+      # Average lines
+      geom_line(
+        data = agg_long,
+        aes(x = dimension, y = score, color = metadata, group = metadata),
+        linewidth = 1.5
+      ) +
+      geom_point(
+        data = agg_long,
+        aes(x = dimension, y = score, color = metadata),
+        size = 4
+      ) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+      theme_minimal() +
+      labs(
+        title = "Dimension Scores: Category Averages with Individual Documents",
+        x = "Dimension",
+        y = "Score",
+        color = "Category"
+      ) +
+      theme(
+        plot.title = element_text(face = "bold", size = 14),
+        legend.position = "right"
+      )
+
+    if (interactive) {
+      p <- ggplotly(p, tooltip = c("metadata", "dimension", "score", "text"))
+    }
+
+    return(p)
+  }
+
+
+  #' Plot multiple documents vs Biber (side by side)
+  #'
+  #' @param results_data Tibble with dimension scores
+  #' @param doc_ids_selected Vector of document IDs to compare
+  #' @return ggplot object
+  #' @export
+  plot_biber_comparison_multiple <- function(results_data, doc_ids_selected) {
+
+    # Limit to 10
+    doc_ids_selected <- head(doc_ids_selected, 10)
+
+    # Get Biber reference data
+    biber_ref <- get_biber_reference()
+
+    # Prepare selected docs data
+    docs_data <- results_data %>%
+      filter(doc_id %in% doc_ids_selected) %>%
+      select(doc_id, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+      pivot_longer(
+        cols = starts_with("Dimension"),
+        names_to = "dimension",
+        values_to = "value"
+      ) %>%
+      mutate(
+        corpus = "Your Texts",
+        genre = doc_id
+      )
+
+    # Replicate Biber for each doc
+    all_data <- map_dfr(doc_ids_selected, function(doc) {
+      bind_rows(
+        biber_ref %>% mutate(doc_id = doc),
+        docs_data %>% filter(doc_id == doc)
+      )
+    })
+
+    # Create plot
+    p <- all_data %>%
+      ggplot(aes(x = 0, y = value)) +
+      geom_text(
+        data = filter(all_data, corpus == "Biber"),
+        aes(label = genre),
+        hjust = 1.1,
+        size = 2,
+        color = "gray30"
+      ) +
+      geom_text(
+        data = filter(all_data, corpus == "Your Texts"),
+        aes(label = genre),
+        hjust = -0.1,
+        size = 2.5,
+        color = "#E74C3C",
+        fontface = "bold"
+      ) +
+      geom_vline(xintercept = 0, linewidth = 0.5, color = "gray50") +
+      facet_grid(doc_id ~ dimension, scales = "free_y") +
+      labs(
+        title = "Selected Documents vs Biber Reference Genres",
+        y = "Score",
+        x = NULL
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        strip.background = element_rect(fill = "gray70"),
+        strip.text = element_text(face = "bold", size = 9)
+      )
+
+    return(p)
+  }
+
+
+  #' Plot multiple categories vs Biber
+  #'
+  #' @param aggregated_data Aggregated data by metadata
+  #' @param categories_selected Vector of categories to compare
+  #' @return ggplot object
+  #' @export
+  plot_biber_comparison_aggregated_multiple <- function(aggregated_data, categories_selected) {
+
+    # Limit to 10
+    categories_selected <- head(categories_selected, 10)
+
+    # Get Biber reference data
+    biber_ref <- get_biber_reference()
+
+    # Prepare category data
+    cats_data <- aggregated_data %>%
+      filter(metadata %in% categories_selected) %>%
+      select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+      pivot_longer(
+        cols = starts_with("Dimension"),
+        names_to = "dimension",
+        values_to = "value"
+      ) %>%
+      mutate(
+        corpus = "Your Categories",
+        genre = paste(metadata, "(avg)")
+      )
+
+    # Replicate Biber for each category
+    all_data <- map_dfr(categories_selected, function(cat) {
+      bind_rows(
+        biber_ref %>% mutate(category = cat),
+        cats_data %>% filter(metadata == cat) %>% mutate(category = cat)
+      )
+    })
+
+    # Create plot
+    p <- all_data %>%
+      ggplot(aes(x = 0, y = value)) +
+      geom_text(
+        data = filter(all_data, corpus == "Biber"),
+        aes(label = genre),
+        hjust = 1.1,
+        size = 2,
+        color = "gray30"
+      ) +
+      geom_text(
+        data = filter(all_data, corpus == "Your Categories"),
+        aes(label = genre),
+        hjust = -0.1,
+        size = 2.5,
+        color = "#3498DB",
+        fontface = "bold"
+      ) +
+      geom_vline(xintercept = 0, linewidth = 0.5, color = "gray50") +
+      facet_grid(category ~ dimension, scales = "free_y") +
+      labs(
+        title = "Selected Categories (Averages) vs Biber Reference Genres",
+        y = "Score",
+        x = NULL
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        strip.background = element_rect(fill = "gray70"),
+        strip.text = element_text(face = "bold", size = 9)
+      )
+
+    return(p)
+  }
 }

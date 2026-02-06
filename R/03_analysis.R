@@ -16,7 +16,7 @@ library(stringr)
 #' @param per_n_words Normalize per this many words (default 1000)
 #' @return Tibble with feature counts
 #' @export
-count_features <- function(tagged_text, per_n_words = 1000) {
+count_features <- function(tagged_text, per_n_words = 100) {
 
   # Collapse into single string
   text_string <- paste(tagged_text, collapse = " ")
@@ -76,6 +76,7 @@ count_features <- function(tagged_text, per_n_words = 1000) {
 }
 
 
+
 #' Calculate MDA dimension scores
 #'
 #' @param feature_counts Output from count_features()
@@ -94,14 +95,20 @@ calculate_dimensions <- function(feature_counts, base_stats = biber_base) {
   merged <- merged %>%
     mutate(
       z_score = (normed - biber_mean) / biber_sd,
-      weighted_z = z_score * loading
+      # Handle loading as character or numeric
+      d_score = case_when(
+        loading == "negative" | loading == -1 ~ -z_score,
+        loading == "positive" | loading == 1 ~ z_score,
+        is.numeric(loading) ~ z_score * loading,
+        TRUE ~ z_score
+      )
     )
 
   # Sum by dimension
   dimensions <- merged %>%
     group_by(dimension) %>%
     summarise(
-      score = sum(weighted_z, na.rm = TRUE),
+      score = sum(d_score, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     pivot_wider(names_from = dimension, values_from = score)

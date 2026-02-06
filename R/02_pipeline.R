@@ -85,14 +85,14 @@ add_st_tags <- function(x,
 #' @param texts Character vector of texts to analyze
 #' @param doc_ids Character vector of document IDs
 #' @param metadata Character vector of metadata labels
-#' @param normalize_per Normalize feature counts per N words (default: 1000)
+#' @param normalize_per Normalize feature counts per N words (default: 100)
 #' @param progress_callback Optional function to call with progress updates
 #' @return Tibble with dimension scores and metadata
 #' @export
 mda_analysis <- function(texts,
                          doc_ids = NULL,
                          metadata = NULL,
-                         normalize_per = 1000,
+                         normalize_per = 100,
                          progress_callback = NULL) {
 
   n_texts <- length(texts)
