@@ -91,4 +91,12 @@ source("modules/ui_processing.R", local = TRUE)
 source("modules/server_processing.R", local = TRUE)
 cat("   ✓ Processing module loaded\n")
 
-cat("   ✓ Data input module loaded\n")
+source("modules/ui_results.R", local = TRUE)
+source("modules/server_results.R", local = TRUE)
+cat("   ✓ Results module loaded\n")
+
+source("R/04_visualization.R", local = TRUE)
+cat("   ✓ Visualization functions loaded\n")
+
+
+

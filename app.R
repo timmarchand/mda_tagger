@@ -64,19 +64,13 @@ ui <- dashboardPage(
       ),
 
       # Tab 3: Results ----
+
       tabItem(
         tabName = "results",
         h2("📊 Results & Visualization"),
-        p("View dimension scores and visualize your corpus."),
+        p("View dimension scores and analyze your corpus."),
         br(),
-        box(
-          title = "Results",
-          width = 12,
-          status = "info",
-          p("Results module coming soon...",
-            class = "text-muted",
-            style = "text-align: center; padding: 40px;")
-        )
+        resultsUI("results")
       ),
 
       # Tab 4: Export ----
@@ -105,8 +99,11 @@ server <- function(input, output, session) {
   # Call data input module
   data_module <- dataInputServer("data_input")
 
-  # Call processing module
-  processing_module <- processingServer("processing", data_module)
+  # Call processing module (pass session for tab switching)
+  processing_module <- processingServer("processing", data_module, session)
+
+  # Call results module
+  resultsServer("results", processing_module)
 
   # Monitor when data is confirmed
   observe({

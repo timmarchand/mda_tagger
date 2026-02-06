@@ -8,7 +8,7 @@
 #' @param id Module namespace ID
 #' @param data_module Reactive data from data input module
 #' @return List of reactive values with processed results
-processingServer <- function(id, data_module) {
+processingServer <- function(id, data_module, paren_session = NULL) {
   moduleServer(id, function(input, output, session) {
 
     # Reactive Values ----
@@ -277,13 +277,10 @@ processingServer <- function(id, data_module) {
     })
 
     # Navigate to Results ----
+
     observeEvent(input$view_results, {
-      # Switch to results tab in parent
-      shiny::updateTabItems(
-        session = session$parent,
-        inputId = "tabs",
-        selected = "results"
-      )
+      # Use shinyjs to click the results tab
+      shinyjs::runjs("$('a[data-value=\"results\"]').tab('show');")
     })
 
     # Module Returns ----
