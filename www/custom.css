@@ -1,0 +1,21 @@
+/* Custom CSS for MDA Shiny App */
+
+/* Brand colors */
+:root {
+  --primary-color: #3c8dbc;
+  --success-color: #00a65a;
+  --warning-color: #f39c12;
+  --danger-color: #dd4b39;
+}
+
+/* Improve box styling */
+.box {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 4px;
+}
+
+/* Better buttons */
+.btn {
+  margin-right: 5px;
+  margin-bottom: 5px;
+}
