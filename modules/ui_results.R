@@ -42,7 +42,7 @@ resultsUI <- function(id) {
             DT::dataTableOutput(ns("results_table"))
           ),
 
-          # Tab 2: Dimension Plots ----
+          # Tab 2: Dimension Plots
           tabPanel(
             "Dimension Scores",
             br(),
@@ -66,7 +66,7 @@ resultsUI <- function(id) {
             plotlyOutput(ns("dimension_plot"), height = "500px")
           ),
 
-          # Tab 3: Text Types ----
+          # Tab 3: Text Types
           tabPanel(
             "Text Types",
             br(),
@@ -101,7 +101,7 @@ resultsUI <- function(id) {
             )
           ),
 
-          # Tab 4: Scatter Plots ----
+          # Tab 4: Scatter Plots
           tabPanel(
             "2D Comparison",
             br(),
@@ -134,7 +134,7 @@ resultsUI <- function(id) {
             plotlyOutput(ns("scatter_plot"), height = "500px")
           ),
 
-          # Tab 5: Summary Statistics ----
+          # Tab 5: Summary Statistics
           tabPanel(
             "Summary Statistics",
             br(),
@@ -145,102 +145,115 @@ resultsUI <- function(id) {
               selected = "metadata"
             ),
             DT::dataTableOutput(ns("summary_table"))
+          ),
+
+          # Tab 6: Biber Comparison
+          tabPanel(
+            "Biber Comparison",
+            br(),
+            fluidRow(
+              column(6,
+                     selectInput(
+                       ns("biber_doc_select"),
+                       "Select documents to compare (up to 10):",
+                       choices = NULL,
+                       multiple = TRUE
+                     )
+              ),
+              column(6,
+                     checkboxInput(
+                       ns("show_all_biber"),
+                       "Show all texts (grid view)",
+                       value = FALSE
+                     )
+              )
+            ),
+            conditionalPanel(
+              condition = paste0("!input['", ns("show_all_biber"), "']"),
+              plotOutput(ns("biber_comparison_plot"), height = "600px")
+            ),
+            conditionalPanel(
+              condition = paste0("input['", ns("show_all_biber"), "']"),
+              plotOutput(ns("biber_comparison_all_plot"), height = "800px")
+            )
+          ),
+
+          # Tab 7: By Category (Aggregated)
+          tabPanel(
+            "By Category",
+            br(),
+            h4("📊 Aggregated Results by Metadata Category"),
+
+            # Category Summary Table
+            fluidRow(
+              column(12,
+                     h5("Category Summary Table"),
+                     DT::dataTableOutput(ns("aggregated_table")),
+                     br()
+              )
+            ),
+
+            hr(),
+
+            # Average Dimension Scores
+            h5("Average Dimension Scores by Category"),
+            fluidRow(
+              column(9,
+                     plotlyOutput(ns("aggregated_dimension_plot"), height = "450px")
+              ),
+              column(3,
+                     selectInput(
+                       ns("categories_to_compare"),
+                       "Select categories:",
+                       choices = NULL,
+                       multiple = TRUE
+                     ),
+                     checkboxInput(
+                       ns("show_individual_docs"),
+                       "Show individual documents",
+                       value = FALSE
+                     )
+              )
+            ),
+
+            hr(),
+
+            # Biber Comparison Section
+            h5("Compare Categories to Biber Reference Genres"),
+            fluidRow(
+              column(6,
+                     selectInput(
+                       ns("biber_categories_select"),
+                       "Select categories to compare (up to 10):",
+                       choices = NULL,
+                       multiple = TRUE
+                     )
+              ),
+              column(6,
+                     radioButtons(
+                       ns("biber_category_mode"),
+                       "Comparison mode:",
+                       choices = c(
+                         "Category averages only" = "avg_only",
+                         "Category + individual docs" = "with_docs"
+                       ),
+                       selected = "avg_only"
+                     )
+              )
+            ),
+
+            fluidRow(
+              column(12,
+                     plotOutput(ns("biber_category_plot"), height = "600px")
+              )
+            )
           )
-        )
-      )
-    ),
 
-    # Tab 6: Biber Comparison ----
-    tabPanel(
-      "Biber Comparison",
-      br(),
-      fluidRow(
-        column(6,
-               selectInput(
-                 ns("biber_doc_select"),
-                 "Select documents to compare (up to 10):",
-                 choices = NULL,
-                 multiple = TRUE
-               )
-        ),
-        column(6,
-               checkboxInput(
-                 ns("show_all_biber"),
-                 "Show all texts (grid view)",
-                 value = FALSE
-               )
-        )
-      ),
-      conditionalPanel(
-        condition = paste0("!input['", ns("show_all_biber"), "']"),
-        plotOutput(ns("biber_comparison_plot"), height = "600px")
-      ),
-      conditionalPanel(
-        condition = paste0("input['", ns("show_all_biber"), "']"),
-        plotOutput(ns("biber_comparison_all_plot"), height = "800px")
-      )
-    ),
+        )  # End tabsetPanel
+      )    # End box
+    ),     # End fluidRow (Main results tabs)
 
-    # Tab 7: By Category (Aggregated) ----
-    tabPanel(
-      "By Category",
-      br(),
-      h4("📊 Aggregated Results by Metadata Category"),
-      p("View average dimension scores for each category/genre in your corpus."),
-
-      fluidRow(
-        # Aggregated table
-        column(12,
-               h5("Category Summary Table"),
-               DT::dataTableOutput(ns("aggregated_table")),
-               br()
-        )
-      ),
-
-      fluidRow(
-        # Aggregated dimension plot
-        column(8,
-               h5("Average Dimension Scores by Category"),
-               plotlyOutput(ns("aggregated_dimension_plot"), height = "500px")
-        ),
-        column(4,
-               checkboxInput(
-                 ns("show_individual_docs"),
-                 "Show individual documents",
-                 value = FALSE
-               ),
-               br(),
-               selectInput(
-                 ns("categories_to_compare"),
-                 "Select categories to display (up to 10):",
-                 choices = NULL,
-                 multiple = TRUE
-               )
-        )
-      ),
-
-      hr(),
-
-      h5("Compare Category to Biber Reference"),
-
-      fluidRow(
-        column(6,
-               selectInput(
-                 ns("biber_categories_select"),
-                 "Select categories to compare (up to 10):",
-                 choices = NULL,
-                 multiple = TRUE
-               )
-        )
-      ),
-
-      fluidRow(
-        column(12,
-               plotOutput(ns("biber_category_plot"), height = "600px")
-        )
-      )
-    ),
-    # Interpretation guide ----
+    # Interpretation guide
     fluidRow(
       box(
         title = "📖 Dimension Interpretations",
@@ -272,5 +285,6 @@ resultsUI <- function(id) {
         )
       )
     )
-  )
-}
+
+  )  # End tagList
+}    # End function

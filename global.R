@@ -52,18 +52,16 @@ if (file.exists("data/biber_base.rds")) {
 
 # ==== Source Functions ====
 cat("🔧 Loading functions...\n")
-
-source("R/05_file_helpers.R", local = TRUE)
+source("R/05_file_helpers.R")
 cat("   ✓ File helpers loaded\n")
-
-source("R/01_utils.R", local = TRUE)
+source("R/01_utils.R")
 cat("   ✓ Core tagging functions loaded\n")
-
-source("R/02_pipeline.R", local = TRUE)
+source("R/02_pipeline.R")
 cat("   ✓ Pipeline functions loaded\n")
-
-source("R/03_analysis.R", local = TRUE)
+source("R/03_analysis.R")
 cat("   ✓ Analysis functions loaded\n")
+source("R/04_visualization.R")
+cat("   ✓ Visualisation functions loaded\n")
 
 # ==== Initialize UDPipe Model ====
 cat("📦 Initializing UDPipe model...\n")
@@ -83,20 +81,17 @@ cat("   ✓ Model ready\n")
 # ==== Source Modules ====
 cat("📦 Loading Shiny modules...\n")
 
-source("modules/ui_data_input.R", local = TRUE)
-source("modules/server_data_input.R", local = TRUE)
+source("modules/ui_data_input.R")
+source("modules/server_data_input.R")
 cat("   ✓ Data input module loaded\n")
 
-source("modules/ui_processing.R", local = TRUE)
-source("modules/server_processing.R", local = TRUE)
+source("modules/ui_processing.R")
+source("modules/server_processing.R")
 cat("   ✓ Processing module loaded\n")
 
-source("modules/ui_results.R", local = TRUE)
-source("modules/server_results.R", local = TRUE)
+source("modules/ui_results.R")
+source("modules/server_results.R")
 cat("   ✓ Results module loaded\n")
-
-source("R/04_visualization.R", local = TRUE)
-cat("   ✓ Visualization functions loaded\n")
 
 
 
