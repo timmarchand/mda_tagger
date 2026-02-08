@@ -131,6 +131,9 @@ mda_analysis <- function(texts,
       # Step 2: Linguistic feature tagging
       dtagged <- dtag_all(tagged)
 
+      # Flatten tagged text for storage
+      tagged_text_flat <- paste(dtagged, collapse = " ")
+
       # Step 3: Count features
       counts <- count_features(dtagged, per_n_words = normalize_per)
       counts$doc_id <- doc_ids[i]
@@ -140,6 +143,7 @@ mda_analysis <- function(texts,
       dims$doc_id <- doc_ids[i]
       dims$metadata = metadata[i]
       dims$n_words <- counts$n_words[1]
+      dims$tagged_text <- tagged_text_flat  # ← Add this line
 
       results[[i]] <- dims
 
@@ -149,6 +153,7 @@ mda_analysis <- function(texts,
         doc_id = doc_ids[i],
         metadata = metadata[i],
         n_words = NA,
+        tagged_text = NA,  # ← Add this line
         Dimension1 = NA,
         Dimension2 = NA,
         Dimension3 = NA,
@@ -157,19 +162,24 @@ mda_analysis <- function(texts,
         status = paste("error:", e$message)
       )
     })
-  }
 
-  # Combine results
-  results_df <- bind_rows(results)
+    # Combine results
+    results_df <- bind_rows(results)
 
-  # Classify text types
-  if (nrow(results_df) > 0) {
-    results_df <- add_closest_text_type(results_df)[[1]]
-  }
+    # Classify text types
+    if (nrow(results_df) > 0) {
+      results_df <- add_closest_text_type(results_df)[[1]]
+    }
 
-  return(results_df)
+    # Ensure tagged_text column exists (add back if lost)
+    if (!"tagged_text" %in% names(results_df)) {
+      # Rebuild tagged_text column from results list
+      results_df$tagged_text <- map_chr(results, ~.x$tagged_text[1])
+    }
+
+    return(results_df)
 }
-
+}
 
 #' Batch process multiple documents with parallel support
 #'

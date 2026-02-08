@@ -380,3 +380,95 @@ summarize_texts <- function(texts, metadata = NULL) {
 
   return(summary_df)
 }
+
+#' Export tagged text in inline format
+#'
+#' @param tagged_text Character vector of tagged text
+#' @param doc_id Document ID
+#' @param output_file Output file path
+#' @export
+export_tagged_inline <- function(tagged_text, doc_id, output_file) {
+  writeLines(tagged_text, output_file)
+}
+
+
+#' Export tagged text in vertical format (one token per line)
+#'
+#' @param tagged_text Character vector of tagged text
+#' @param doc_id Document ID
+#' @param output_file Output file path
+#' @export
+export_tagged_vertical <- function(tagged_text, doc_id, output_file) {
+  # Split on spaces
+  tokens <- str_split(tagged_text, "\\s+")[[1]]
+
+  # Write one token per line
+  writeLines(tokens, output_file)
+}
+
+
+#' Export all tagged texts to a directory
+#'
+#' @param results_data Tibble with doc_id and tagged_text columns
+#' @param output_dir Output directory path
+#' @param format Format: "inline" or "vertical"
+#' @export
+export_all_tagged_texts <- function(results_data, output_dir, format = "inline") {
+
+  # Create output directory if it doesn't exist
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+
+  # Export each text
+  for (i in seq_len(nrow(results_data))) {
+    doc_id <- results_data$doc_id[i]
+    tagged_text <- results_data$tagged_text[i]
+
+    # Clean filename
+    safe_filename <- str_replace_all(doc_id, "[^A-Za-z0-9_-]", "_")
+    output_file <- file.path(output_dir, paste0(safe_filename, ".txt"))
+
+    if (format == "vertical") {
+      export_tagged_vertical(tagged_text, doc_id, output_file)
+    } else {
+      export_tagged_inline(tagged_text, doc_id, output_file)
+    }
+  }
+
+  return(output_dir)
+}
+
+
+#' Create a ZIP file of all tagged texts
+#'
+#' @param results_data Tibble with doc_id and tagged_text columns
+#' @param format Format: "inline" or "vertical"
+#' @return Path to ZIP file
+#' @export
+create_tagged_texts_zip <- function(results_data, format = "inline") {
+
+  # Create temp directory
+  temp_dir <- tempfile("tagged_texts_")
+  dir.create(temp_dir)
+
+  # Export all texts
+  export_all_tagged_texts(results_data, temp_dir, format = format)
+
+  # Create ZIP file
+  zip_file <- tempfile("tagged_texts_", fileext = ".zip")
+
+  # Get all files in temp dir
+  files_to_zip <- list.files(temp_dir, full.names = TRUE)
+
+  # Create zip (use relative paths)
+  withr::with_dir(temp_dir, {
+    zip::zip(
+      zipfile = zip_file,
+      files = basename(files_to_zip),
+      mode = "cherry-pick"
+    )
+  })
+
+  return(zip_file)
+}

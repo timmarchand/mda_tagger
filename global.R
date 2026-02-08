@@ -20,6 +20,9 @@ library(stringr)
 library(readr)
 library(tibble)
 library(data.table)
+library(zip)
+library(openxlsx)
+library(withr)
 
 cat("   ✓ Core packages loaded\n")
 
@@ -93,5 +96,8 @@ source("modules/ui_results.R")
 source("modules/server_results.R")
 cat("   ✓ Results module loaded\n")
 
+source("modules/ui_export.R")
+source("modules/server_export.R")
+cat("   ✓ Export module loaded\n")
 
 

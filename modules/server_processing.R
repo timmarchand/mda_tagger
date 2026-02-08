@@ -158,6 +158,7 @@ processingServer <- function(id, data_module, paren_session = NULL) {
                 doc_id = doc_ids[i],
                 metadata = metadata[i],
                 n_words = counts$n_words[1],
+                tagged_text = paste(dtagged, collapse = " "),  # ← Add this line
                 Dimension1 = NA,
                 Dimension2 = NA,
                 Dimension3 = NA,
@@ -195,6 +196,9 @@ processingServer <- function(id, data_module, paren_session = NULL) {
         if (length(results) > 0) {
           rv$processed_data <- bind_rows(results)
 
+          # Save tagged_text before classification
+          tagged_text_backup <- rv$processed_data$tagged_text
+
           # Add text type classification
           if (nrow(rv$processed_data) > 0 &&
               all(c("Dimension1", "Dimension2", "Dimension3", "Dimension4", "Dimension5") %in% names(rv$processed_data))) {
@@ -204,6 +208,12 @@ processingServer <- function(id, data_module, paren_session = NULL) {
               if (is.list(classified)) {
                 rv$processed_data <- classified[[1]]
               }
+
+              # Restore tagged_text if it was lost
+              if (!"tagged_text" %in% names(rv$processed_data) && !is.null(tagged_text_backup)) {
+                rv$processed_data$tagged_text <- tagged_text_backup
+              }
+
             }, error = function(e) {
               cat("Warning: Could not classify text types:", e$message, "\n")
               rv$processed_data$closest_text_type <- "unknown"

@@ -6,7 +6,6 @@ source("global.R")
 
 # UI ----
 ui <- dashboardPage(
-
   dashboardHeader(
     title = "MDA Toolkit",
     titleWidth = 300
@@ -21,9 +20,7 @@ ui <- dashboardPage(
       menuItem("3. Results", tabName = "results", icon = icon("chart-bar")),
       menuItem("4. Export", tabName = "export", icon = icon("download"))
     ),
-
     hr(),
-
     div(
       style = "padding: 15px;",
       h5("About MDA"),
@@ -64,7 +61,6 @@ ui <- dashboardPage(
       ),
 
       # Tab 3: Results ----
-
       tabItem(
         tabName = "results",
         h2("📊 Results & Visualization"),
@@ -79,20 +75,14 @@ ui <- dashboardPage(
         h2("💾 Export Results"),
         p("Download your results in various formats."),
         br(),
-        box(
-          title = "Export",
-          width = 12,
-          status = "success",
-          p("Export module coming soon...",
-            class = "text-muted",
-            style = "text-align: center; padding: 40px;")
-        )
+        exportUI("export")
       )
-    )
-  )
-)
 
-# Server ----
+    )  # End tabItems
+  )    # End dashboardBody
+)      # End dashboardPage
+
+
 # Server ----
 server <- function(input, output, session) {
 
@@ -105,10 +95,14 @@ server <- function(input, output, session) {
   # Call results module
   resultsServer("results", processing_module)
 
+  # Call export module
+  exportServer("export", processing_module)
+
   # Monitor when data is confirmed
   observe({
     if (!is.null(data_module$data_confirmed()) && data_module$data_confirmed()) {
       data <- data_module$selected_text_and_meta()
+
       cat("\n✅ Data confirmed!\n")
       cat("  Texts:", length(data$text), "\n")
       cat("  Doc IDs:", paste(head(data$doc_ids, 3), collapse = ", "), "...\n")
@@ -133,7 +127,6 @@ server <- function(input, output, session) {
       cat("  Processed:", nrow(result$processed_data), "texts\n")
     }
   })
-
 }
 
 # Run ----
