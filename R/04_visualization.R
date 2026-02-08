@@ -745,106 +745,106 @@ plot_biber_comparison_aggregated_multiple <- function(aggregated_data, categorie
     )
 
   return(p)
+}
+#' Plot single category average with all its individual documents
+#'
+#' @param aggregated_data Aggregated data by metadata
+#' @param individual_data Full results data with individual docs
+#' @param category_selected Which category to show
+#' @return ggplot object
+#' @export
+plot_category_with_docs_biber <- function(aggregated_data, individual_data, category_selected) {
 
-  #' Plot single category average with all its individual documents
-  #'
-  #' @param aggregated_data Aggregated data by metadata
-  #' @param individual_data Full results data with individual docs
-  #' @param category_selected Which category to show
-  #' @return ggplot object
-  #' @export
-  plot_category_with_docs_biber <- function(aggregated_data, individual_data, category_selected) {
+  # Get Biber reference data
+  biber_ref <- get_biber_reference()
 
-    # Get Biber reference data
-    biber_ref <- get_biber_reference()
-
-    # Get category average
-    category_avg <- aggregated_data %>%
-      filter(metadata == category_selected) %>%
-      select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
-      pivot_longer(
-        cols = starts_with("Dimension"),
-        names_to = "dimension",
-        values_to = "value"
-      ) %>%
-      mutate(
-        corpus = "Category Average",
-        genre = paste(category_selected, "(avg)")
-      )
-
-    # Get individual documents for this category
-    individual_docs <- individual_data %>%
-      filter(metadata == category_selected) %>%
-      select(doc_id, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
-      pivot_longer(
-        cols = starts_with("Dimension"),
-        names_to = "dimension",
-        values_to = "value"
-      ) %>%
-      mutate(
-        corpus = "Individual Texts",
-        genre = doc_id
-      )
-
-    # Calculate alpha based on number of documents (more docs = lower alpha)
-    n_docs <- length(unique(individual_docs$genre))
-    doc_alpha <- max(0.2, min(0.8, 5 / n_docs))  # Range from 0.2 to 0.8
-
-    # Combine all data
-    combined <- bind_rows(
-      biber_ref,
-      individual_docs,
-      category_avg
+  # Get category average
+  category_avg <- aggregated_data %>%
+    filter(metadata == category_selected) %>%
+    select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+    pivot_longer(
+      cols = starts_with("Dimension"),
+      names_to = "dimension",
+      values_to = "value"
+    ) %>%
+    mutate(
+      corpus = "Category Average",
+      genre = paste(category_selected, "(avg)")
     )
 
-    # Create plot
-    p <- combined %>%
-      ggplot(aes(x = 0, y = value)) +
-      # Biber reference (left side, gray)
-      geom_text(
-        data = filter(combined, corpus == "Biber"),
-        aes(label = genre),
-        hjust = 1.1,
-        size = 2.5,
-        color = "gray30"
-      ) +
-      # Individual documents (right side, red, transparent)
-      geom_text(
-        data = filter(combined, corpus == "Individual Texts"),
-        aes(label = genre),
-        hjust = -0.1,
-        size = 2,
-        color = "#E74C3C",
-        alpha = doc_alpha
-      ) +
-      # Category average (right side, blue, bold)
-      geom_text(
-        data = filter(combined, corpus == "Category Average"),
-        aes(label = genre),
-        hjust = -0.1,
-        size = 3.5,
-        color = "#3498DB",
-        fontface = "bold"
-      ) +
-      geom_vline(xintercept = 0, linewidth = 1, color = "gray50") +
-      facet_wrap(~ dimension, scales = "free_y", ncol = 3) +
-      labs(
-        title = paste("Biber Genres vs", category_selected, "- Average & Individual Texts (n =", n_docs, ")"),
-        y = "Score",
-        x = NULL
-      ) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank(),
-        strip.background = element_rect(fill = "gray70"),
-        strip.text = element_text(face = "bold", size = 11)
-      )
+  # Get individual documents for this category
+  individual_docs <- individual_data %>%
+    filter(metadata == category_selected) %>%
+    select(doc_id, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+    pivot_longer(
+      cols = starts_with("Dimension"),
+      names_to = "dimension",
+      values_to = "value"
+    ) %>%
+    mutate(
+      corpus = "Individual Texts",
+      genre = doc_id
+    )
 
-    return(p)
-  }
+  # Calculate alpha based on number of documents (more docs = lower alpha)
+  n_docs <- length(unique(individual_docs$genre))
+  doc_alpha <- max(0.2, min(0.8, 5 / n_docs))  # Range from 0.2 to 0.8
+
+  # Combine all data
+  combined <- bind_rows(
+    biber_ref,
+    individual_docs,
+    category_avg
+  )
+
+  # Create plot
+  p <- combined %>%
+    ggplot(aes(x = 0, y = value)) +
+    # Biber reference (left side, gray)
+    geom_text(
+      data = filter(combined, corpus == "Biber"),
+      aes(label = genre),
+      hjust = 1.1,
+      size = 2.5,
+      color = "gray30"
+    ) +
+    # Individual documents (right side, red, transparent)
+    geom_text(
+      data = filter(combined, corpus == "Individual Texts"),
+      aes(label = genre),
+      hjust = -0.1,
+      size = 2,
+      color = "#E74C3C",
+      alpha = doc_alpha
+    ) +
+    # Category average (right side, blue, bold)
+    geom_text(
+      data = filter(combined, corpus == "Category Average"),
+      aes(label = genre),
+      hjust = -0.1,
+      size = 3.5,
+      color = "#3498DB",
+      fontface = "bold"
+    ) +
+    geom_vline(xintercept = 0, linewidth = 1, color = "gray50") +
+    facet_wrap(~ dimension, scales = "free_y", ncol = 3) +
+    labs(
+      title = paste("Biber Genres vs", category_selected, "- Average & Individual Texts (n =", n_docs, ")"),
+      y = "Score",
+      x = NULL
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      strip.background = element_rect(fill = "gray70"),
+      strip.text = element_text(face = "bold", size = 11)
+    )
+
+  return(p)
+}
 
   #' Plot categories vs Biber with optional individual documents
   #'
@@ -955,4 +955,4 @@ plot_biber_comparison_aggregated_multiple <- function(aggregated_data, categorie
 
     return(p)
   }
-}
+
