@@ -81,9 +81,10 @@ count_features <- function(tagged_text, per_n_words = 100) {
 #'
 #' @param feature_counts Output from count_features()
 #' @param base_stats The biber_base dataset with means, SDs, and loadings
+#' @param deflated Remove low-frequency features (mean < 0.1) per Nini (2019)
 #' @return Tibble with dimension scores
 #' @export
-calculate_dimensions <- function(feature_counts, base_stats = biber_base) {
+calculate_dimensions <- function(feature_counts, base_stats = biber_base, deflated = TRUE) {
 
   # Merge counts with base statistics
   merged <- feature_counts %>%
@@ -91,11 +92,16 @@ calculate_dimensions <- function(feature_counts, base_stats = biber_base) {
     left_join(base_stats, by = "feature") %>%
     filter(!is.na(dimension), dimension != "Others")
 
-  # Calculate z-scores
+  # Apply deflation filter if requested
+  if (deflated) {
+    merged <- merged %>%
+      filter(biber_mean >= 0.1)
+  }
+
+  # Calculate z-scores and weighted scores
   merged <- merged %>%
     mutate(
       z_score = (normed - biber_mean) / biber_sd,
-      # Handle loading as character or numeric
       d_score = case_when(
         loading == "negative" | loading == -1 ~ -z_score,
         loading == "positive" | loading == 1 ~ z_score,
@@ -115,7 +121,6 @@ calculate_dimensions <- function(feature_counts, base_stats = biber_base) {
 
   return(dimensions)
 }
-
 
 #' Classify text into Biber's text types
 #'

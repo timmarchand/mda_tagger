@@ -140,7 +140,7 @@ processingServer <- function(id, data_module, paren_session = NULL) {
             rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ Counted", nrow(counts), "features")))
 
             # Step 4: Calculate dimensions
-            dims <- calculate_dimensions(counts)
+            dims <- calculate_dimensions(counts, deflated = input$use_deflated)
             rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ Calculated dimension scores")))
 
             # Store result - ensure dims is a proper tibble
@@ -150,6 +150,7 @@ processingServer <- function(id, data_module, paren_session = NULL) {
                   doc_id = doc_ids[i],
                   metadata = metadata[i],
                   n_words = counts$n_words[1],
+                  tagged_text = paste(rv$tagged_texts[[doc_ids[i]]], collapse = " "),
                   .before = 1
                 )
             } else {

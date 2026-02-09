@@ -89,10 +89,12 @@ add_st_tags <- function(x,
 #' @param progress_callback Optional function to call with progress updates
 #' @return Tibble with dimension scores and metadata
 #' @export
+
 mda_analysis <- function(texts,
                          doc_ids = NULL,
                          metadata = NULL,
                          normalize_per = 100,
+                         deflated = TRUE,
                          progress_callback = NULL) {
 
   n_texts <- length(texts)

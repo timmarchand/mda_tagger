@@ -33,6 +33,15 @@ exportUI <- function(id) {
           selected = "inline"
         ),
 
+        checkboxInput(
+          ns("bracket_tags"),
+          "Wrap tags in {{}} brackets",
+          value = FALSE
+        ),
+
+        p(class = "text-muted", style = "font-size: 11px;",
+          "Example: 'the_DT<DEMP>' becomes 'the{{DT<DEMP>}}'"),
+
         br(),
 
         downloadButton(

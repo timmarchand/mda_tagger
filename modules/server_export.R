@@ -51,7 +51,8 @@ exportServer <- function(id, processing_module) {
           # Create ZIP
           zip_path <- create_tagged_texts_zip(
             results_data(),
-            format = input$tagged_format
+            format = input$tagged_format,
+            bracket_tags = input$bracket_tags  # ← Add this parameter
           )
 
           incProgress(0.9, detail = "Finalizing...")

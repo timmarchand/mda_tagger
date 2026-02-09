@@ -121,11 +121,20 @@ resultsServer <- function(id, processing_module) {
     output$dimension_plot <- renderPlotly({
       req(results_data())
 
-      plot_dimensions(
-        results_data(),
-        color_by = input$plot_color_by,
-        interactive = TRUE
-      )
+      if (input$dimension_plot_type == "single") {
+        plot_dimension_single(
+          results_data(),
+          dimension = input$single_dimension,
+          show_biber = input$show_biber_single,
+          interactive = TRUE
+        )
+      } else {
+        plot_dimensions(
+          results_data(),
+          color_by = input$plot_color_by,
+          interactive = TRUE
+        )
+      }
     })
 
     # Text Type Plot ----
@@ -134,16 +143,16 @@ resultsServer <- function(id, processing_module) {
 
       plot_text_types(results_data(), interactive = TRUE)
     })
-
     # Scatter Plot ----
     output$scatter_plot <- renderPlotly({
       req(results_data())
 
-      plot_dimension_scatter(
+      plot_dimension_ellipse(
         results_data(),
         dim_x = input$scatter_dim_x,
         dim_y = input$scatter_dim_y,
         color_by = input$scatter_color_by,
+        show_ellipse = input$show_ellipse,
         interactive = TRUE
       )
     })

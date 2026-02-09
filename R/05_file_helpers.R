@@ -386,8 +386,26 @@ summarize_texts <- function(texts, metadata = NULL) {
 #' @param tagged_text Character vector of tagged text
 #' @param doc_id Document ID
 #' @param output_file Output file path
+#' @param bracket_tags Wrap tags in {{}} brackets (default: FALSE)
 #' @export
-export_tagged_inline <- function(tagged_text, doc_id, output_file) {
+#' Export tagged text in inline format
+#'
+#' @param tagged_text Character vector of tagged text
+#' @param doc_id Document ID
+#' @param output_file Output file path
+#' @param bracket_tags Wrap tags in {{}} brackets (default: FALSE)
+#' @export
+export_tagged_inline <- function(tagged_text, doc_id, output_file, bracket_tags = FALSE) {
+
+  # Remove spaces between tags (word_POS <TAG> -> word_POS<TAG>)
+  tagged_text <- str_replace_all(tagged_text, "(\\S+)\\s+(<)", "\\1\\2")
+
+  if (bracket_tags) {
+    # Convert word_TAG<MDA> to word_{{TAG<MDA>}}
+    # Keep the underscore, wrap everything after it
+    tagged_text <- str_replace_all(tagged_text, "_(\\S+)", "_{{\\1}}")
+  }
+
   writeLines(tagged_text, output_file)
 }
 
@@ -397,23 +415,34 @@ export_tagged_inline <- function(tagged_text, doc_id, output_file) {
 #' @param tagged_text Character vector of tagged text
 #' @param doc_id Document ID
 #' @param output_file Output file path
+#' @param bracket_tags Wrap tags in {{}} brackets (default: FALSE)
 #' @export
-export_tagged_vertical <- function(tagged_text, doc_id, output_file) {
-  # Split on spaces
+export_tagged_vertical <- function(tagged_text, doc_id, output_file, bracket_tags = FALSE) {
+
+  # Remove spaces between tags (word_POS <TAG> -> word_POS<TAG>)
+  tagged_text <- str_replace_all(tagged_text, "(\\S+)\\s+(<)", "\\1\\2")
+
+  if (bracket_tags) {
+    # Convert word_TAG<MDA> to word_{{TAG<MDA>}}
+    # Keep the underscore, wrap everything after it
+    tagged_text <- str_replace_all(tagged_text, "_(\\S+)", "_{{\\1}}")
+  }
+
+  # Split on spaces to get individual tokens
   tokens <- str_split(tagged_text, "\\s+")[[1]]
 
   # Write one token per line
   writeLines(tokens, output_file)
 }
 
-
 #' Export all tagged texts to a directory
 #'
 #' @param results_data Tibble with doc_id and tagged_text columns
 #' @param output_dir Output directory path
 #' @param format Format: "inline" or "vertical"
+#' @param bracket_tags Wrap tags in {{}} brackets (default: FALSE)
 #' @export
-export_all_tagged_texts <- function(results_data, output_dir, format = "inline") {
+export_all_tagged_texts <- function(results_data, output_dir, format = "inline", bracket_tags = FALSE) {
 
   # Create output directory if it doesn't exist
   if (!dir.exists(output_dir)) {
@@ -430,9 +459,9 @@ export_all_tagged_texts <- function(results_data, output_dir, format = "inline")
     output_file <- file.path(output_dir, paste0(safe_filename, ".txt"))
 
     if (format == "vertical") {
-      export_tagged_vertical(tagged_text, doc_id, output_file)
+      export_tagged_vertical(tagged_text, doc_id, output_file, bracket_tags = bracket_tags)
     } else {
-      export_tagged_inline(tagged_text, doc_id, output_file)
+      export_tagged_inline(tagged_text, doc_id, output_file, bracket_tags = bracket_tags)
     }
   }
 
@@ -440,35 +469,3 @@ export_all_tagged_texts <- function(results_data, output_dir, format = "inline")
 }
 
 
-#' Create a ZIP file of all tagged texts
-#'
-#' @param results_data Tibble with doc_id and tagged_text columns
-#' @param format Format: "inline" or "vertical"
-#' @return Path to ZIP file
-#' @export
-create_tagged_texts_zip <- function(results_data, format = "inline") {
-
-  # Create temp directory
-  temp_dir <- tempfile("tagged_texts_")
-  dir.create(temp_dir)
-
-  # Export all texts
-  export_all_tagged_texts(results_data, temp_dir, format = format)
-
-  # Create ZIP file
-  zip_file <- tempfile("tagged_texts_", fileext = ".zip")
-
-  # Get all files in temp dir
-  files_to_zip <- list.files(temp_dir, full.names = TRUE)
-
-  # Create zip (use relative paths)
-  withr::with_dir(temp_dir, {
-    zip::zip(
-      zipfile = zip_file,
-      files = basename(files_to_zip),
-      mode = "cherry-pick"
-    )
-  })
-
-  return(zip_file)
-}

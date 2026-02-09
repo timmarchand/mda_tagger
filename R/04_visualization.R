@@ -11,7 +11,7 @@ library(purrr)
 
 #' Plot dimension scores
 #'
-#' Plot dimension scores as grouped bars
+#' Plot dimension scores as boxplots faceted by metadata
 #'
 #' @param results_data Tibble with dimension scores
 #' @param color_by Column to color by (default: "metadata")
@@ -30,20 +30,27 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
     ) %>%
     mutate(dimension = gsub("Dimension", "D", dimension))
 
+  # Get number of categories for viridis
+  n_categories <- length(unique(plot_data[[color_by]]))
+
   # Create plot
   p <- ggplot(plot_data, aes(x = dimension, y = score, fill = .data[[color_by]])) +
-    geom_boxplot(alpha = 0.7) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_boxplot(alpha = 0.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.5) +
+    facet_wrap(~.data[[color_by]], scales = "free_y") +
+    viridis::scale_fill_viridis(discrete = TRUE, option = "viridis") +
     theme_minimal() +
     labs(
-      title = "Multi-Dimensional Analysis Scores Distribution",
+      title = "Multi-Dimensional Analysis Scores by Category",
       x = "Dimension",
       y = "Score",
       fill = str_to_title(color_by)
     ) +
     theme(
       plot.title = element_text(face = "bold", size = 14),
-      legend.position = "right"
+      legend.position = "none",  # Remove legend since facets show categories
+      strip.background = element_rect(fill = "gray90", color = NA),
+      strip.text = element_text(face = "bold", size = 11)
     )
 
   if (interactive) {
@@ -52,7 +59,6 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
 
   return(p)
 }
-
 
 #' Plot dimension distributions
 #'
@@ -952,6 +958,142 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
         strip.background = element_rect(fill = "gray70"),
         strip.text = element_text(face = "bold", size = 11)
       )
+
+    return(p)
+  }
+
+  #' Plot single dimension with optional Biber reference
+  #'
+  #' @param results_data Tibble with dimension scores
+  #' @param dimension Which dimension to plot (default: "Dimension1")
+  #' @param show_biber Show Biber reference genres (default: TRUE)
+  #' @param interactive Return interactive plotly plot (default: FALSE)
+  #' @return ggplot2 or plotly object
+  #' @export
+  plot_dimension_single <- function(results_data,
+                                    dimension = "Dimension1",
+                                    show_biber = TRUE,
+                                    interactive = FALSE) {
+
+    # Prepare data
+    plot_data <- results_data %>%
+      mutate(
+        score = .data[[dimension]],
+        pos_neg = ifelse(score > 0, "Positive", "Negative")
+      )
+
+    # Start plot
+    p <- ggplot(plot_data, aes(y = score, x = 1, label = doc_id, fill = pos_neg)) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+      geom_point(shape = 21, size = 3, alpha = 0.7) +
+      ggrepel::geom_text_repel(
+        nudge_x = 0.2,
+        direction = "y",
+        hjust = 0,
+        size = 3,
+        max.overlaps = 20
+      ) +
+      scale_fill_manual(
+        values = c("Positive" = "#3498DB", "Negative" = "#E74C3C")
+      ) +
+      labs(
+        title = paste(dimension, "Distribution"),
+        y = "Score",
+        fill = NULL
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        legend.position = "bottom"
+      )
+
+    # Add Biber reference if requested
+    if (show_biber) {
+      biber_ref <- get_biber_reference() %>%
+        filter(dimension == dimension) %>%
+        mutate(x = 0.5)
+
+      p <- p +
+        geom_point(data = biber_ref, aes(y = value, x = x),
+                   shape = 21, fill = "gray70", size = 2, inherit.aes = FALSE) +
+        ggrepel::geom_text_repel(
+          data = biber_ref,
+          aes(y = value, x = x, label = genre),
+          nudge_x = -0.2,
+          direction = "y",
+          hjust = 1,
+          size = 2.5,
+          color = "gray30",
+          max.overlaps = 20,
+          inherit.aes = FALSE
+        ) +
+        xlim(0.2, 1.8)
+    } else {
+      p <- p + xlim(0.8, 1.8)
+    }
+
+    if (interactive) {
+      p <- ggplotly(p, tooltip = c("doc_id", "score"))
+    }
+
+    return(p)
+  }
+
+
+  #' Plot dimension distribution with stat_ellipse
+  #'
+  #' @param results_data Tibble with dimension scores
+  #' @param dim_x X-axis dimension (default: "Dimension1")
+  #' @param dim_y Y-axis dimension (default: "Dimension2")
+  #' @param color_by Column to color by (default: "metadata")
+  #' @param show_ellipse Show confidence ellipses (default: TRUE)
+  #' @param ellipse_level Confidence level for ellipse (default: 0.95)
+  #' @param interactive Return interactive plotly plot (default: TRUE)
+  #' @return ggplot2 or plotly object
+  #' @export
+  plot_dimension_ellipse <- function(results_data,
+                                     dim_x = "Dimension1",
+                                     dim_y = "Dimension2",
+                                     color_by = "metadata",
+                                     show_ellipse = TRUE,
+                                     ellipse_level = 0.95,
+                                     interactive = TRUE) {
+
+    p <- ggplot(results_data, aes(x = .data[[dim_x]], y = .data[[dim_y]],
+                                  color = .data[[color_by]])) +
+      geom_point(size = 3, alpha = 0.7) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+      theme_minimal() +
+      labs(
+        title = paste(dim_x, "vs", dim_y),
+        x = dim_x,
+        y = dim_y,
+        color = str_to_title(color_by)
+      ) +
+      theme(plot.title = element_text(face = "bold", size = 14))
+
+    # Add ellipses if requested
+    if (show_ellipse) {
+      # Check if there are enough points per group
+      group_counts <- results_data %>%
+        group_by(.data[[color_by]]) %>%
+        summarise(n = n(), .groups = "drop")
+
+      # Only add ellipse for groups with 3+ points
+      if (all(group_counts$n >= 3)) {
+        p <- p + stat_ellipse(level = ellipse_level, linewidth = 1)
+      } else {
+        warning("Some groups have < 3 points, skipping ellipses")
+      }
+    }
+
+    if (interactive) {
+      p <- ggplotly(p, tooltip = c("colour", "x", "y"))
+    }
 
     return(p)
   }

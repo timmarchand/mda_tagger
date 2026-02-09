@@ -31,7 +31,7 @@ resultsUI <- function(id) {
         tabsetPanel(
           id = ns("results_tabs"),
 
-          # Tab 1: Overview Table
+          # Tab 1: Overview Table ----
           tabPanel(
             "Overview Table",
             br(),
@@ -42,31 +42,57 @@ resultsUI <- function(id) {
             DT::dataTableOutput(ns("results_table"))
           ),
 
-          # Tab 2: Dimension Plots
+          # Tab 2: Dimension Plots ----
           tabPanel(
             "Dimension Scores",
             br(),
             fluidRow(
               column(3,
-                     selectInput(
-                       ns("plot_color_by"),
-                       "Color by:",
-                       choices = c("metadata", "closest_text_type"),
-                       selected = "metadata"
+                     radioButtons(
+                       ns("dimension_plot_type"),
+                       "Plot type:",
+                       choices = c(
+                         "Boxplots (all dimensions)" = "boxplot",
+                         "Single dimension view" = "single"
+                       ),
+                       selected = "boxplot"
                      )
               ),
               column(3,
-                     checkboxInput(
-                       ns("show_individual_lines"),
-                       "Show individual lines",
-                       value = TRUE
+                     conditionalPanel(
+                       condition = paste0("input['", ns("dimension_plot_type"), "'] == 'boxplot'"),
+                       selectInput(
+                         ns("plot_color_by"),
+                         "Color by:",
+                         choices = c("metadata", "closest_text_type"),
+                         selected = "metadata"
+                       )
+                     ),
+                     conditionalPanel(
+                       condition = paste0("input['", ns("dimension_plot_type"), "'] == 'single'"),
+                       selectInput(
+                         ns("single_dimension"),
+                         "Select dimension:",
+                         choices = paste0("Dimension", 1:5),
+                         selected = "Dimension1"
+                       )
+                     )
+              ),
+              column(3,
+                     conditionalPanel(
+                       condition = paste0("input['", ns("dimension_plot_type"), "'] == 'single'"),
+                       checkboxInput(
+                         ns("show_biber_single"),
+                         "Show Biber reference",
+                         value = TRUE
+                       )
                      )
               )
             ),
             plotlyOutput(ns("dimension_plot"), height = "500px")
           ),
 
-          # Tab 3: Text Types
+          # Tab 3: Text Types ----
           tabPanel(
             "Text Types",
             br(),
@@ -101,7 +127,7 @@ resultsUI <- function(id) {
             )
           ),
 
-          # Tab 4: Scatter Plots
+          # Tab 4: Scatter Plots ----
           tabPanel(
             "2D Comparison",
             br(),
@@ -129,12 +155,19 @@ resultsUI <- function(id) {
                        choices = c("metadata", "closest_text_type"),
                        selected = "metadata"
                      )
+              ),
+              column(3,
+                     checkboxInput(
+                       ns("show_ellipse"),
+                       "Show confidence ellipses",
+                       value = FALSE
+                     )
               )
             ),
             plotlyOutput(ns("scatter_plot"), height = "500px")
           ),
 
-          # Tab 5: Summary Statistics
+          # Tab 5: Summary Statistics ----
           tabPanel(
             "Summary Statistics",
             br(),
@@ -147,7 +180,7 @@ resultsUI <- function(id) {
             DT::dataTableOutput(ns("summary_table"))
           ),
 
-          # Tab 6: Biber Comparison
+          # Tab 6: Biber Comparison ----
           tabPanel(
             "Biber Comparison",
             br(),
@@ -178,7 +211,7 @@ resultsUI <- function(id) {
             )
           ),
 
-          # Tab 7: By Category (Aggregated)
+          # Tab 7: By Category (Aggregated) ----
           tabPanel(
             "By Category",
             br(),

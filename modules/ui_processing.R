@@ -27,7 +27,7 @@ processingUI <- function(id) {
         status = "primary",
         solidHeader = TRUE,
 
-        h4("Pipeline Steps:"),
+        h4("Pipeline Steps:"), ####
         tags$ol(
           tags$li(
             icon("check-circle", class = "text-success"),
@@ -81,10 +81,13 @@ processingUI <- function(id) {
         ),
 
         checkboxInput(
-          ns("extract_hesitations"),
-          "Extract hesitation markers",
-          value = FALSE
+          ns("use_deflated"),
+          "Use deflated scores (recommended)",
+          value = TRUE
         ),
+
+        p(class = "text-muted", style = "font-size: 11px;",
+          "Deflated scores exclude rare features (mean < 0.1) following Nini (2019)"),
 
         hr(),
 
