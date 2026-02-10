@@ -125,7 +125,7 @@ resultsServer <- function(id, processing_module) {
         plot_dimension_single(
           results_data(),
           dimension = input$single_dimension,
-          show_biber = input$show_biber_single,
+          color_by = input$single_color_by,
           interactive = TRUE
         )
       } else {

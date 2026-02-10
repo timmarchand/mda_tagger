@@ -81,10 +81,11 @@ resultsUI <- function(id) {
               column(3,
                      conditionalPanel(
                        condition = paste0("input['", ns("dimension_plot_type"), "'] == 'single'"),
-                       checkboxInput(
-                         ns("show_biber_single"),
-                         "Show Biber reference",
-                         value = TRUE
+                       selectInput(
+                         ns("single_color_by"),
+                         "Group by:",
+                         choices = c("metadata", "closest_text_type"),
+                         selected = "metadata"
                        )
                      )
               )

@@ -19,22 +19,22 @@ dataInputUI <- function(id) {
         solidHeader = TRUE,
 
         radioButtons(
-          ns("input_type"),
+          ns("input_method"),
           "Choose input method:",
           choices = c(
-            "Paste Text" = "paste",
-            "Upload File (CSV/TXT/DOCX)" = "file",
-            "Upload Multiple Files (Corpus)" = "corpus"
+            "Paste text" = "paste",
+            "Upload single file (TXT/DOCX/CSV)" = "single",
+            "Upload multiple corpus files" = "corpus",
+            "Upload pre-tagged texts (CSV)" = "pretagged"
           ),
-          selected = "paste",
-          inline = FALSE
+          selected = "paste"
         ),
 
         hr(),
 
-        # Paste Text Panel
+        # Paste Text Panel ----
         conditionalPanel(
-          condition = paste0("input['", ns("input_type"), "'] == 'paste'"),
+          condition = paste0("input['", ns("input_method"), "'] == 'paste'"),
           h4("📝 Paste Your Text"),
           p("Paste text directly for quick analysis of a single document."),
           textAreaInput(
@@ -53,9 +53,9 @@ dataInputUI <- function(id) {
           helpText("Best for: Quick tests, single documents, short texts")
         ),
 
-        # File Upload Panel
+        # File Upload Panel ----
         conditionalPanel(
-          condition = paste0("input['", ns("input_type"), "'] == 'file'"),
+          condition = paste0("input['", ns("input_method"), "'] == 'file'"),
           h4("📄 Upload Single File"),
           p("Upload a CSV with multiple texts, or a single TXT/DOCX file."),
           fileInput(
@@ -84,9 +84,9 @@ dataInputUI <- function(id) {
           helpText("Supported formats: .txt, .csv, .docx")
         ),
 
-        # Corpus Upload Panel
+        # Corpus Upload Panel ----
         conditionalPanel(
-          condition = paste0("input['", ns("input_type"), "'] == 'corpus'"),
+          condition = paste0("input['", ns("input_method"), "'] == 'corpus'"),
           h4("📚 Upload Corpus (Multiple Files)"),
           p("Upload multiple text files to create a corpus for comparison."),
           fileInput(
@@ -102,8 +102,46 @@ dataInputUI <- function(id) {
 
           helpText("Upload multiple .txt or .docx files. Each file = one document.")
         )
-      )
-    ),
+      ),
+
+      # Pre-tagged text upload ----
+      conditionalPanel(
+        condition = paste0("input['", ns("input_method"), "'] == 'pretagged'"),
+
+        h4("📄 Upload Pre-Tagged Texts"),
+        p("Upload a CSV with pre-tagged texts. Required columns:"),
+        tags$ul(
+          tags$li(tags$code("doc_id"), " - Document identifier"),
+          tags$li(tags$code("tagged_text"), " - Text with POS and MDA tags (e.g., the_DT<DEMP> cat_NN)"),
+          tags$li(tags$code("metadata"), " - Category/group label (optional)")
+        ),
+
+        p(class = "text-muted",
+          "Example format:",
+          tags$br(),
+          tags$code("doc_id,tagged_text,metadata"),
+          tags$br(),
+          tags$code('text1,"the_DT<DEMP> cat_NN sat_VBD",fiction')
+        ),
+
+        downloadLink(ns("download_template"), "Download CSV template"),
+
+        br(), br(),
+
+        fileInput(
+          ns("pretagged_file"),
+          "Choose CSV file:",
+          accept = ".csv"
+        ),
+
+        # Preview
+        conditionalPanel(
+          condition = paste0("output['", ns("pretagged_preview_available"), "']"),
+          h5("Preview:"),
+          DT::dataTableOutput(ns("pretagged_preview"), height = "300px"),
+          br()
+        )
+      ),
 
     fluidRow(
       box(
@@ -111,17 +149,15 @@ dataInputUI <- function(id) {
         width = 12,
         status = "info",
 
+        # Data Summary (shown when data is loaded) ----
         conditionalPanel(
-          condition = paste0("output['", ns("data_available"), "'] == true"),
+          condition = paste0("output['", ns("data_available"), "']"),
+          br(),
           verbatimTextOutput(ns("data_summary")),
-          hr(),
-          actionButton(
-            ns("confirm_data"),
-            "✅ Confirm & Proceed to Processing",
-            icon = icon("arrow-right"),
-            class = "btn-primary btn-lg",
-            width = "100%"
-          )
+          br(),
+          actionButton(ns("confirm_data"), "✅ Confirm & Proceed",
+                       class = "btn-success btn-lg btn-block")
+        )
         ),
 
         conditionalPanel(

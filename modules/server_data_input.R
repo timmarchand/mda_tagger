@@ -18,13 +18,13 @@ dataInputServer <- function(id) {
     uploaded_data <- reactive({
 
       # Paste text
-      if (input$input_type == "paste") {
+      if (input$input_method == "paste") {
         req(input$pasted_text)
         return(process_pasted_text(input$pasted_text))
       }
 
       # Single file upload
-      if (input$input_type == "file") {
+      if (input$input_method == "file") {
         req(input$upload_csv)
         result <- read_uploaded_file(
           input$upload_csv,
@@ -34,7 +34,7 @@ dataInputServer <- function(id) {
       }
 
       # Corpus upload
-      if (input$input_type == "corpus") {
+      if (input$input_method == "corpus") {
         req(input$upload_corpus)
         metadata_assignments <- corpus_metadata()
         return(read_corpus_files(input$upload_corpus, metadata_assignments))
@@ -45,7 +45,8 @@ dataInputServer <- function(id) {
 
     # CSV Column Selection UI ----
     output$column_selection_ui <- renderUI({
-      if (input$input_type != "file") return(NULL)
+      req(input$input_method)  # ← Add this
+      if (input$input_method != "file") return(NULL)
       if (is.null(uploaded_data())) return(NULL)
       if (uploaded_data()$type != "csv") return(NULL)
 
@@ -95,10 +96,12 @@ dataInputServer <- function(id) {
 
     # Update meta column choices based on text column selection
     observe({
-      if (input$input_type != "file") return()
+      req(input$input_method)  # ← Add this
+      if (input$input_method != "file") return()
       if (is.null(uploaded_data())) return()
       if (uploaded_data()$type != "csv") return()
       if (is.null(input$text_column)) return()
+
 
       all_columns <- names(uploaded_data()$content)
       available_meta_columns <- setdiff(all_columns, input$text_column)
@@ -120,11 +123,14 @@ dataInputServer <- function(id) {
       }
     })
 
-    # Corpus Metadata UI ----
+    # Corpus Metadata UI ----source("modules/server_data_input.R")
     output$corpus_metadata_container <- renderUI({
-      if (input$input_type != "corpus") return(NULL)
+      req(input$input_method)  # ← Add this
+      if (input$input_method != "corpus") return(NULL)
       if (is.null(input$upload_corpus)) return(NULL)
       if (nrow(input$upload_corpus) == 0) return(NULL)
+
+      # ... rest of code
 
       files <- input$upload_corpus
 
@@ -300,7 +306,24 @@ dataInputServer <- function(id) {
     })
 
     # Final Data Assembly ----
+    # Final Data Assembly ----
     selected_text_and_meta <- reactive({
+
+      # Safety check for input_type
+      req(input$input_method)
+
+      # Handle pre-tagged data
+      if (input$input_method == "pretagged") {
+        req(pretagged_data())
+        return(list(
+          type = "pretagged",
+          text = pretagged_data()$tagged_text,
+          meta = pretagged_data()$metadata,
+          doc_ids = pretagged_data()$doc_id,
+          tagged_text = pretagged_data()$tagged_text
+        ))
+      }
+
       req(uploaded_data())
 
       # For paste, txt, corpus - already have everything
@@ -334,6 +357,9 @@ dataInputServer <- function(id) {
           doc_ids = doc_ids
         ))
       }
+
+      # Default return NULL if nothing matches
+      return(NULL)
     })
 
     # Data Summary Output ----
@@ -373,6 +399,93 @@ dataInputServer <- function(id) {
         duration = 3
       )
     })
+
+    # Pre-tagged file upload ----
+    pretagged_data <- reactive({
+      req(input$pretagged_file)
+
+      tryCatch({
+        df <- readr::read_csv(input$pretagged_file$datapath, show_col_types = FALSE)
+
+        # Validate required columns
+        if (!"doc_id" %in% names(df)) {
+          showNotification("CSV must have 'doc_id' column", type = "error", duration = 5)
+          return(NULL)
+        }
+
+        if (!"tagged_text" %in% names(df)) {
+          showNotification("CSV must have 'tagged_text' column", type = "error", duration = 5)
+          return(NULL)
+        }
+
+        # Add metadata column if missing
+        if (!"metadata" %in% names(df)) {
+          df$metadata <- "unknown"
+        }
+
+        # Validate tagged_text format (basic check)
+        sample_text <- df$tagged_text[1]
+        if (!grepl("_[A-Z]+", sample_text)) {
+          showNotification(
+            "Warning: tagged_text doesn't appear to have POS tags (word_TAG format)",
+            type = "warning",
+            duration = 8
+          )
+        }
+
+        return(df)
+
+      }, error = function(e) {
+        showNotification(paste("Error reading CSV:", e$message), type = "error", duration = 10)
+        return(NULL)
+      })
+    })
+
+    # Preview for pre-tagged data
+    output$pretagged_preview_available <- reactive({
+      !is.null(pretagged_data())
+    })
+    outputOptions(output, "pretagged_preview_available", suspendWhenHidden = FALSE)
+
+    output$pretagged_preview <- DT::renderDataTable({
+      req(pretagged_data())
+
+      pretagged_data() %>%
+        mutate(tagged_text = str_trunc(tagged_text, 100)) %>%
+        DT::datatable(
+          options = list(pageLength = 5, scrollX = TRUE),
+          rownames = FALSE
+        )
+    })
+
+    # Confirm pre-tagged data
+    observeEvent(input$confirm_pretagged, {
+      req(pretagged_data())
+
+      data_confirmed(TRUE)
+
+      showNotification(
+        paste("Pre-tagged data confirmed:", nrow(pretagged_data()), "texts"),
+        type = "message",
+        duration = 3
+      )
+    })
+
+    # Download pre-tagged template
+    output$download_template <- downloadHandler(
+      filename = "pretagged_template.csv",
+      content = function(file) {
+        template <- tibble(
+          doc_id = c("text1", "text2"),
+          tagged_text = c(
+            "the_DT<DEMP> cat_NN sat_VBD<PASTP> on_IN the_DT mat_NN ._SENT",
+            "this_DT<DEMP> is_VBZ a_DT test_NN<NN> ._SENT"
+          ),
+          metadata = c("example", "example")
+        )
+        readr::write_csv(template, file)
+      }
+    )
 
     # Module Returns ----
     return(list(

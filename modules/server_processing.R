@@ -126,14 +126,27 @@ processingServer <- function(id, data_module, paren_session = NULL) {
 
           tryCatch({
 
-            # Step 1: POS tagging
-            tagged <- add_st_tags(texts[i])
-            rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ POS tagged:", length(tagged), "tokens")))
+            # Check if data is already tagged
+            if (!is.null(data$type) && data$type == "pretagged") {
 
-            # Step 2: Linguistic tagging
-            dtagged <- dtag_all(tagged)
-            rv$tagged_texts[[doc_ids[i]]] <- dtagged
-            rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ Feature tagged")))
+              # Data is pre-tagged, skip to feature counting
+              rv$log_messages <- c(rv$log_messages, log_message("  ✓ Using pre-tagged text"))
+
+              dtagged <- str_split(data$tagged_text[i], "\\s+")[[1]]
+              rv$tagged_texts[[doc_ids[i]]] <- dtagged
+
+            } else {
+
+              # Normal workflow: POS tag then MDA tag
+              # Step 1: POS tagging
+              tagged <- add_st_tags(texts[i])
+              rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ POS tagged:", length(tagged), "tokens")))
+
+              # Step 2: Linguistic tagging
+              dtagged <- dtag_all(tagged)
+              rv$tagged_texts[[doc_ids[i]]] <- dtagged
+              rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ Feature tagged")))
+            }
 
             # Step 3: Count features
             counts <- count_features(dtagged, per_n_words = input$normalize_per)
@@ -143,7 +156,7 @@ processingServer <- function(id, data_module, paren_session = NULL) {
             dims <- calculate_dimensions(counts, deflated = input$use_deflated)
             rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ Calculated dimension scores")))
 
-            # Store result - ensure dims is a proper tibble
+            # Store result
             if (is.data.frame(dims)) {
               results[[i]] <- dims %>%
                 mutate(
@@ -159,7 +172,7 @@ processingServer <- function(id, data_module, paren_session = NULL) {
                 doc_id = doc_ids[i],
                 metadata = metadata[i],
                 n_words = counts$n_words[1],
-                tagged_text = paste(dtagged, collapse = " "),  # ← Add this line
+                tagged_text = paste(rv$tagged_texts[[doc_ids[i]]], collapse = " "),
                 Dimension1 = NA,
                 Dimension2 = NA,
                 Dimension3 = NA,
@@ -171,66 +184,69 @@ processingServer <- function(id, data_module, paren_session = NULL) {
             rv$log_messages <- c(rv$log_messages, log_message(paste("  ✅ Complete:", doc_ids[i])))
 
           }, error = function(e) {
-            rv$log_messages <- c(
-              rv$log_messages,
-              log_message(paste("  ❌ Error:", e$message))
-            )
 
-            results[[i]] <- tibble(
-              doc_id = doc_ids[i],
-              metadata = metadata[i],
-              n_words = NA,
-              Dimension1 = NA,
-              Dimension2 = NA,
-              Dimension3 = NA,
-              Dimension4 = NA,
-              Dimension5 = NA,
-              status = paste("error:", e$message)
-            )
-          })
+      }, error = function(e) {
+        rv$log_messages <- c(
+          rv$log_messages,
+          log_message(paste("  ❌ Error:", e$message))
+        )
 
-          # Update progress
-          rv$progress_pct <- round(100 * i / n_texts)
-        }
+        results[[i]] <- tibble(
+          doc_id = doc_ids[i],
+          metadata = metadata[i],
+          n_words = NA,
+          tagged_text = NA,
+          Dimension1 = NA,
+          Dimension2 = NA,
+          Dimension3 = NA,
+          Dimension4 = NA,
+          Dimension5 = NA,
+          status = paste("error:", e$message)
+        )
+      })
 
-        # Combine results
-        if (length(results) > 0) {
-          rv$processed_data <- bind_rows(results)
+      # Update progress
+      rv$progress_pct <- round(100 * i / n_texts)
+    }
 
-          # Save tagged_text before classification
-          tagged_text_backup <- rv$processed_data$tagged_text
+    # Combine results
+    if (length(results) > 0) {
+      rv$processed_data <- bind_rows(results)
 
-          # Add text type classification
-          if (nrow(rv$processed_data) > 0 &&
-              all(c("Dimension1", "Dimension2", "Dimension3", "Dimension4", "Dimension5") %in% names(rv$processed_data))) {
+      # Save tagged_text before classification
+      tagged_text_backup <- rv$processed_data$tagged_text
 
-            tryCatch({
-              classified <- add_closest_text_type(rv$processed_data)
-              if (is.list(classified)) {
-                rv$processed_data <- classified[[1]]
-              }
+      # Add text type classification
+      if (nrow(rv$processed_data) > 0 &&
+          all(c("Dimension1", "Dimension2", "Dimension3", "Dimension4", "Dimension5") %in% names(rv$processed_data))) {
 
-              # Restore tagged_text if it was lost
-              if (!"tagged_text" %in% names(rv$processed_data) && !is.null(tagged_text_backup)) {
-                rv$processed_data$tagged_text <- tagged_text_backup
-              }
-
-            }, error = function(e) {
-              cat("Warning: Could not classify text types:", e$message, "\n")
-              rv$processed_data$closest_text_type <- "unknown"
-            })
-          } else {
-            rv$processed_data$closest_text_type <- "unknown"
+        tryCatch({
+          classified <- add_closest_text_type(rv$processed_data)
+          if (is.list(classified)) {
+            rv$processed_data <- classified[[1]]
           }
 
-          cat("\n✅ Stored", nrow(rv$processed_data), "processed texts\n")
-        } else {
-          cat("\n⚠️ No results to store\n")
-        }
+          # Restore tagged_text if it was lost
+          if (!"tagged_text" %in% names(rv$processed_data) && !is.null(tagged_text_backup)) {
+            rv$processed_data$tagged_text <- tagged_text_backup
+          }
 
-        rv$log_messages <- c(rv$log_messages, log_message("═══ Processing Complete ═══"))
+        }, error = function(e) {
+          cat("Warning: Could not classify text types:", e$message, "\n")
+          rv$processed_data$closest_text_type <- "unknown"
+        })
+      } else {
+        rv$processed_data$closest_text_type <- "unknown"
+      }
 
-      })
+      cat("\n✅ Stored", nrow(rv$processed_data), "processed texts\n")
+    } else {
+      cat("\n⚠️ No results to store\n")
+    }
+
+    rv$log_messages <- c(rv$log_messages, log_message("═══ Processing Complete ═══"))
+
+  })  # End withProgress
 
       # Re-enable button
       shinyjs::enable("start_processing")
