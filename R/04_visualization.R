@@ -962,10 +962,7 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
     return(p)
   }
 
-  #' Plot single dimension with optional Biber reference
-  #'
-  #' Plot single dimension with optional Biber reference
-  #'
+
   #' Plot single dimension with violin plots by category
   #'
   #' @param results_data Tibble with dimension scores
@@ -1064,4 +1061,40 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
 
     return(p)
   }
+  #' Plot heatmap of mean dimension scores by category
+  #'
+  #' @param aggregated_data Aggregated data by metadata
+  #' @return A pheatmap object
+  #' @export
+  plot_dimension_heatmap <- function(aggregated_data) {
 
+    # Prepare matrix for heatmap
+    summary_mat <- aggregated_data %>%
+      select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
+      column_to_rownames(var = "metadata") %>%
+      as.matrix()
+
+    # Calculate max absolute value for symmetric color scale
+    max_abs <- max(abs(summary_mat), na.rm = TRUE)
+    breaks <- seq(-max_abs, max_abs, length.out = 101)
+
+    # Create heatmap
+    pheatmap::pheatmap(
+      summary_mat,
+      cluster_rows = TRUE,
+      cluster_cols = FALSE,
+      display_numbers = TRUE,
+      fontsize_number = 12,
+      fontface_number = "bold",
+      number_format = "%.1f",
+      number_color = "grey20",
+      main = "Mean MDA Scores by Category",
+      color = colorRampPalette(c("#3498DB", "#ECF0F1", "#E74C3C"))(100),
+      breaks = breaks,
+      border_color = "white",
+      cellwidth = 60,
+      cellheight = 35,
+      angle_col = 0,
+      fontsize = 12
+    )
+  }

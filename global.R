@@ -23,6 +23,7 @@ library(openxlsx)
 library(data.table)
 library(zip)
 library(withr)
+library(pheatmap)
 
 cat("   ✓ Core packages loaded\n")
 

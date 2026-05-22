@@ -124,8 +124,7 @@ read_corpus_files <- function(files_info, metadata_assignments = NULL) {
 
   n_files <- nrow(files_info)
   texts <- character(n_files)
-  doc_ids <- paste0("doc_", sprintf("%03d", 1:n_files))
-
+  doc_ids <- tools::file_path_sans_ext(files_info$name)
   # Default metadata from filenames if not provided
   if (is.null(metadata_assignments) || length(metadata_assignments) != n_files) {
     metadata_assignments <- tools::file_path_sans_ext(files_info$name)
@@ -418,20 +417,12 @@ export_tagged_inline <- function(tagged_text, doc_id, output_file, bracket_tags 
 #' @param bracket_tags Wrap tags in {{}} brackets (default: FALSE)
 #' @export
 export_tagged_vertical <- function(tagged_text, doc_id, output_file, bracket_tags = FALSE) {
-
   # Remove spaces between tags (word_POS <TAG> -> word_POS<TAG>)
   tagged_text <- str_replace_all(tagged_text, "(\\S+)\\s+(<)", "\\1\\2")
-
   if (bracket_tags) {
-    # Convert word_TAG<MDA> to word_{{TAG<MDA>}}
-    # Keep the underscore, wrap everything after it
     tagged_text <- str_replace_all(tagged_text, "_(\\S+)", "_{{\\1}}")
   }
-
-  # Split on spaces to get individual tokens
   tokens <- str_split(tagged_text, "\\s+")[[1]]
-
-  # Write one token per line
   writeLines(tokens, output_file)
 }
 

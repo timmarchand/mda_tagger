@@ -55,7 +55,7 @@ dataInputUI <- function(id) {
 
         # File Upload Panel ----
         conditionalPanel(
-          condition = paste0("input['", ns("input_method"), "'] == 'file'"),
+          condition = paste0("input['", ns("input_method"), "'] == 'single'"),  # ← Changed from 'file'
           h4("📄 Upload Single File"),
           p("Upload a CSV with multiple texts, or a single TXT/DOCX file."),
           fileInput(
@@ -101,48 +101,50 @@ dataInputUI <- function(id) {
           uiOutput(ns("corpus_metadata_container")),
 
           helpText("Upload multiple .txt or .docx files. Each file = one document.")
-        )
-      ),
-
-      # Pre-tagged text upload ----
-      conditionalPanel(
-        condition = paste0("input['", ns("input_method"), "'] == 'pretagged'"),
-
-        h4("📄 Upload Pre-Tagged Texts"),
-        p("Upload a CSV with pre-tagged texts. Required columns:"),
-        tags$ul(
-          tags$li(tags$code("doc_id"), " - Document identifier"),
-          tags$li(tags$code("tagged_text"), " - Text with POS and MDA tags (e.g., the_DT<DEMP> cat_NN)"),
-          tags$li(tags$code("metadata"), " - Category/group label (optional)")
         ),
 
-        p(class = "text-muted",
-          "Example format:",
-          tags$br(),
-          tags$code("doc_id,tagged_text,metadata"),
-          tags$br(),
-          tags$code('text1,"the_DT<DEMP> cat_NN sat_VBD",fiction')
-        ),
-
-        downloadLink(ns("download_template"), "Download CSV template"),
-
-        br(), br(),
-
-        fileInput(
-          ns("pretagged_file"),
-          "Choose CSV file:",
-          accept = ".csv"
-        ),
-
-        # Preview
+        # Pre-tagged text upload ----
         conditionalPanel(
-          condition = paste0("output['", ns("pretagged_preview_available"), "']"),
-          h5("Preview:"),
-          DT::dataTableOutput(ns("pretagged_preview"), height = "300px"),
-          br()
-        )
-      ),
+          condition = paste0("input['", ns("input_method"), "'] == 'pretagged'"),
 
+          h4("📄 Upload Pre-Tagged Texts"),
+          p("Upload a CSV with pre-tagged texts. Required columns:"),
+          tags$ul(
+            tags$li(tags$code("doc_id"), " - Document identifier"),
+            tags$li(tags$code("tagged_text"), " - Text with POS and MDA tags (e.g., the_DT<DEMP> cat_NN)"),
+            tags$li(tags$code("metadata"), " - Category/group label (optional)")
+          ),
+
+          p(class = "text-muted",
+            "Example format:",
+            tags$br(),
+            tags$code("doc_id,tagged_text,metadata"),
+            tags$br(),
+            tags$code('text1,"the_DT<DEMP> cat_NN sat_VBD",fiction')
+          ),
+
+          downloadLink(ns("download_template"), "Download CSV template"),
+
+          br(), br(),
+
+          fileInput(
+            ns("pretagged_file"),
+            "Choose CSV file:",
+            accept = ".csv"
+          ),
+
+          # Preview
+          conditionalPanel(
+            condition = paste0("output['", ns("pretagged_preview_available"), "']"),
+            h5("Preview:"),
+            DT::dataTableOutput(ns("pretagged_preview"), height = "300px"),
+            br()
+          )
+        )  # End pretagged panel
+      )    # End box
+    ),     # End first fluidRow
+
+    # Data Summary box ----
     fluidRow(
       box(
         title = "📊 Data Summary",
@@ -157,16 +159,15 @@ dataInputUI <- function(id) {
           br(),
           actionButton(ns("confirm_data"), "✅ Confirm & Proceed",
                        class = "btn-success btn-lg btn-block")
-        )
         ),
 
         conditionalPanel(
-          condition = paste0("output['", ns("data_available"), "'] == false"),
+          condition = paste0("!output['", ns("data_available"), "']"),  # ← Fixed condition
           p("No data loaded yet. Please select an input method above.",
             class = "text-muted",
             style = "text-align: center; padding: 20px;")
         )
       )
     )
-  )
-}
+  )  # End tagList
+}    # End function

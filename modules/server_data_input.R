@@ -24,7 +24,7 @@ dataInputServer <- function(id) {
       }
 
       # Single file upload
-      if (input$input_method == "file") {
+      if (input$input_method == "single") {  # ← Changed from "file"
         req(input$upload_csv)
         result <- read_uploaded_file(
           input$upload_csv,
@@ -45,8 +45,8 @@ dataInputServer <- function(id) {
 
     # CSV Column Selection UI ----
     output$column_selection_ui <- renderUI({
-      req(input$input_method)  # ← Add this
-      if (input$input_method != "file") return(NULL)
+      req(input$input_method)
+      if (input$input_method != "single") return(NULL)
       if (is.null(uploaded_data())) return(NULL)
       if (uploaded_data()$type != "csv") return(NULL)
 
@@ -80,6 +80,13 @@ dataInputServer <- function(id) {
           selected = NULL
         ),
 
+        # Add metadata value filter
+        conditionalPanel(
+          condition = paste0("input['", session$ns("meta_column"), "'] != null && input['", session$ns("meta_column"), "'].length > 0"),
+          br(),
+          uiOutput(session$ns("meta_value_filter_ui"))
+        ),
+
         if (length(high_cardinality_cols) > 0) {
           div(
             style = "margin-top: 10px; padding: 10px; background-color: #fff3cd; border-radius: 4px;",
@@ -97,7 +104,7 @@ dataInputServer <- function(id) {
     # Update meta column choices based on text column selection
     observe({
       req(input$input_method)  # ← Add this
-      if (input$input_method != "file") return()
+      if (input$input_method != "single") return()
       if (is.null(uploaded_data())) return()
       if (uploaded_data()$type != "csv") return()
       if (is.null(input$text_column)) return()
@@ -123,7 +130,88 @@ dataInputServer <- function(id) {
       }
     })
 
-    # Corpus Metadata UI ----source("modules/server_data_input.R")
+    # Metadata value filter UI ----
+    output$meta_value_filter_ui <- renderUI({
+      req(input$meta_column, uploaded_data())
+
+      # Get unique values from the selected metadata column(s)
+      df <- uploaded_data()$content
+
+      # If multiple meta columns selected, combine them
+      if (length(input$meta_column) > 1) {
+        combined_values <- apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
+        unique_values <- unique(combined_values)
+      } else {
+        unique_values <- unique(df[[input$meta_column]])
+      }
+
+      # Sort and get counts
+      value_counts <- table(if (length(input$meta_column) > 1) combined_values else df[[input$meta_column]])
+      value_counts <- sort(value_counts, decreasing = TRUE)
+
+      # Create choices with counts
+      choices_with_counts <- setNames(
+        names(value_counts),
+        paste0(names(value_counts), " (n=", value_counts, ")")
+      )
+
+      tagList(
+        h5("🎯 Filter Metadata Values"),
+        p("Select which categories to include in analysis:"),
+
+        div(
+          style = "margin-bottom: 10px;",
+          actionButton(
+            session$ns("select_all_meta"),
+            "Select All",
+            class = "btn-sm btn-info",
+            style = "margin-right: 5px;"
+          ),
+          actionButton(
+            session$ns("deselect_all_meta"),
+            "Deselect All",
+            class = "btn-sm btn-secondary"
+          )
+        ),
+
+        checkboxGroupInput(
+          session$ns("meta_values_selected"),
+          label = NULL,
+          choices = choices_with_counts,
+          selected = names(value_counts)  # All selected by default
+        ),
+
+        textOutput(session$ns("filtered_text_count"))
+      )
+    })
+
+    # Select all metadata values
+    observeEvent(input$select_all_meta, {
+      req(input$meta_column, uploaded_data())
+
+      df <- uploaded_data()$content
+      if (length(input$meta_column) > 1) {
+        combined_values <- apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
+        all_values <- unique(combined_values)
+      } else {
+        all_values <- unique(df[[input$meta_column]])
+      }
+
+      updateCheckboxGroupInput(session, "meta_values_selected", selected = all_values)
+    })
+
+    # Deselect all metadata values
+    observeEvent(input$deselect_all_meta, {
+      updateCheckboxGroupInput(session, "meta_values_selected", selected = character(0))
+    })
+
+    # Show count of filtered texts
+    output$filtered_text_count <- renderText({
+      req(input$meta_values_selected)
+      paste("Selected:", length(input$meta_values_selected), "categories")
+    })
+
+    # Corpus Metadata UI ----
     output$corpus_metadata_container <- renderUI({
       req(input$input_method)  # ← Add this
       if (input$input_method != "corpus") return(NULL)
@@ -306,7 +394,6 @@ dataInputServer <- function(id) {
     })
 
     # Final Data Assembly ----
-    # Final Data Assembly ----
     selected_text_and_meta <- reactive({
 
       # Safety check for input_type
@@ -336,20 +423,47 @@ dataInputServer <- function(id) {
       }
 
       # For CSV - need column selection
+      # For CSV - need column selection
       if (uploaded_data()$type == "csv") {
         req(input$text_column)
         df <- uploaded_data()$content
+
+        # Generate text data first
         text_data <- as.character(df[[input$text_column]])
 
-        # Generate doc_ids
-        doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
-
         # Get metadata
-        meta_data <- if (!is.null(input$meta_column) && length(input$meta_column) > 0) {
-          apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
+        if (!is.null(input$meta_column) && length(input$meta_column) > 0) {
+          if (length(input$meta_column) > 1) {
+            meta_data <- apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
+          } else {
+            meta_data <- as.character(df[[input$meta_column]])
+          }
+
+          # Filter by selected metadata values if specified
+          if (!is.null(input$meta_values_selected) && length(input$meta_values_selected) > 0) {
+            keep_rows <- meta_data %in% input$meta_values_selected
+
+            # Apply filter to BOTH text and metadata
+            text_data <- text_data[keep_rows]
+            meta_data <- meta_data[keep_rows]
+
+            # Show notification about filtering
+            n_filtered <- sum(keep_rows)
+            n_total <- length(keep_rows)
+            if (n_filtered < n_total) {
+              showNotification(
+                paste("Filtered:", n_filtered, "of", n_total, "texts selected"),
+                type = "message",
+                duration = 3
+              )
+            }
+          }
         } else {
-          rep("unknown", length(text_data))
+          meta_data <- rep("unknown", length(text_data))
         }
+
+        # Generate doc_ids AFTER filtering
+        doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
 
         return(list(
           text = text_data,

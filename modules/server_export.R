@@ -20,52 +20,46 @@ exportServer <- function(id, processing_module) {
       return(NULL)
     })
 
-    # Download Tagged Texts ZIP ----
-    output$download_tagged_zip <- downloadHandler(
-      filename = function() {
-        paste0("tagged_texts_", format(Sys.Date(), "%Y%m%d"), ".zip")
-      },
-      content = function(file) {
-        req(results_data())
-
-        # DEBUG: Check what columns exist
-        cat("\n=== Available columns ===\n")
-        print(names(results_data()))
-        cat("========================\n")
-
-        # Check if tagged_text column exists
-        if (!"tagged_text" %in% names(results_data())) {
-          showNotification(
-            "Error: Tagged text not available. Please reprocess your data.",
-            type = "error",
-            duration = 10
-          )
-          return(NULL)
-        }
-
-        # Show progress
-        withProgress(message = 'Creating ZIP file...', value = 0, {
-
-          incProgress(0.3, detail = "Exporting texts...")
-
-          # Create ZIP
-          zip_path <- create_tagged_texts_zip(
-            results_data(),
-            format = input$tagged_format,
-            bracket_tags = input$bracket_tags  # ← Add this parameter
-          )
-
-          incProgress(0.9, detail = "Finalizing...")
-
-          # Copy to download location
-          file.copy(zip_path, file, overwrite = TRUE)
-
-          # Clean up temp file
-          unlink(zip_path)
-        })
-      },
-      contentType = "application/zip"
+  output$download_tagged_zip <- downloadHandler(
+  filename = function() {
+    paste0("tagged_texts_", format(Sys.Date(), "%Y%m%d"), ".zip")
+  },
+  content = function(file) {
+    req(results_data())
+    cat("\n=== doc_ids ===\n")
+    print(head(results_data()$doc_id))
+    validate(
+      need("tagged_text" %in% names(results_data()),
+           "Tagged text not available. Please reprocess your data.")
     )
+
+    withProgress(message = 'Creating ZIP file...', value = 0, {
+      incProgress(0.2, detail = "Exporting texts...")
+
+      # Write files to a temp directory
+      tmp_dir <- file.path(tempdir(), paste0("tagged_export_", Sys.getpid()))
+
+      export_all_tagged_texts(
+        results_data(),
+        output_dir = tmp_dir,
+        format = input$tagged_format,
+        bracket_tags = input$bracket_tags
+      )
+
+      incProgress(0.7, detail = "Zipping...")
+
+      # Zip the directory contents into the download target
+      txt_files <- list.files(tmp_dir, full.names = TRUE)
+      zip::zip(zipfile = file, files = txt_files, mode = "cherry-pick")
+
+      incProgress(1, detail = "Done")
+
+      # Clean up
+      unlink(tmp_dir, recursive = TRUE)
+    })
+  },
+  contentType = "application/zip"
+)
 
     # Download Tables (Excel) ----
     output$download_tables <- downloadHandler(

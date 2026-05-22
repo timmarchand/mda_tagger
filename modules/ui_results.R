@@ -11,7 +11,6 @@ resultsUI <- function(id) {
   ns <- NS(id)
 
   tagList(
-
     # Summary boxes
     fluidRow(
       valueBoxOutput(ns("box_texts_processed"), width = 3),
@@ -31,9 +30,34 @@ resultsUI <- function(id) {
         tabsetPanel(
           id = ns("results_tabs"),
 
-          # Tab 1: Overview Table ----
+          # Tab 1: Summary Statistics ----
           tabPanel(
-            "Overview Table",
+            "Summary Statistics",
+            br(),
+
+            # Summary table
+            h4("Summary by Category"),
+            selectInput(
+              ns("summary_group_by"),
+              "Group by:",
+              choices = c("metadata", "closest_text_type"),
+              selected = "metadata"
+            ),
+            DT::dataTableOutput(ns("summary_table")),
+
+            br(),
+            hr(),
+
+            # Heatmap
+            h4("Mean Dimension Scores Heatmap"),
+            plotOutput(ns("dimension_heatmap"), height = "500px"),
+            p(class = "text-muted", style = "margin-top: 10px;",
+              "Rows are clustered by similarity. Positive scores (red) vs negative scores (blue).")
+          ),
+
+          # Tab 2: Document Dimensions (Overview Table) ----
+          tabPanel(
+            "Document Dimensions",
             br(),
             div(
               style = "margin-bottom: 10px;",
@@ -42,7 +66,7 @@ resultsUI <- function(id) {
             DT::dataTableOutput(ns("results_table"))
           ),
 
-          # Tab 2: Dimension Plots ----
+          # Tab 3: Dimension Scores ----
           tabPanel(
             "Dimension Scores",
             br(),
@@ -93,42 +117,7 @@ resultsUI <- function(id) {
             plotlyOutput(ns("dimension_plot"), height = "500px")
           ),
 
-          # Tab 3: Text Types ----
-          tabPanel(
-            "Text Types",
-            br(),
-            fluidRow(
-              column(6,
-                     plotlyOutput(ns("text_type_plot"), height = "400px")
-              ),
-              column(6,
-                     h4("Text Type Descriptions"),
-                     div(
-                       style = "max-height: 400px; overflow-y: auto; padding: 10px;",
-                       tags$dl(
-                         tags$dt("Intimate interpersonal interaction"),
-                         tags$dd("Private conversations, high involvement, immediate context"),
-                         tags$dt("Informational interaction"),
-                         tags$dd("Public conversations, informational focus"),
-                         tags$dt("Scientific exposition"),
-                         tags$dd("Academic prose, technical descriptions, impersonal"),
-                         tags$dt("Learned exposition"),
-                         tags$dd("Academic prose, abstract concepts, formal"),
-                         tags$dt("Imaginative narrative"),
-                         tags$dd("Fiction, creative writing, narrative focus"),
-                         tags$dt("General narrative exposition"),
-                         tags$dd("Non-fiction narrative, reportage style"),
-                         tags$dt("Situated reportage"),
-                         tags$dd("News reporting, immediate context"),
-                         tags$dt("Involved persuasion"),
-                         tags$dd("Editorials, persuasive essays, personal stance")
-                       )
-                     )
-              )
-            )
-          ),
-
-          # Tab 4: Scatter Plots ----
+          # Tab 4: 2D Comparison ----
           tabPanel(
             "2D Comparison",
             br(),
@@ -168,22 +157,40 @@ resultsUI <- function(id) {
             plotlyOutput(ns("scatter_plot"), height = "500px")
           ),
 
-          # Tab 5: Summary Statistics ----
+          # Tab 5: Biber vs Meta ----
           tabPanel(
-            "Summary Statistics",
+            "Biber vs Meta",
             br(),
-            selectInput(
-              ns("summary_group_by"),
-              "Group by:",
-              choices = c("metadata", "closest_text_type"),
-              selected = "metadata"
+            h4("📊 Compare Categories to Biber Reference Genres"),
+
+            fluidRow(
+              column(6,
+                     selectInput(
+                       ns("biber_categories_select"),
+                       "Select categories to compare (up to 10):",
+                       choices = NULL,
+                       multiple = TRUE
+                     )
+              ),
+              column(6,
+                     radioButtons(
+                       ns("biber_category_mode"),
+                       "Comparison mode:",
+                       choices = c(
+                         "Category averages only" = "avg_only",
+                         "Category + individual docs" = "with_docs"
+                       ),
+                       selected = "avg_only"
+                     )
+              )
             ),
-            DT::dataTableOutput(ns("summary_table"))
+
+            plotOutput(ns("biber_category_plot"), height = "600px")
           ),
 
-          # Tab 6: Biber Comparison ----
+          # Tab 6: Biber vs All Docs (Biber Comparison) ----
           tabPanel(
-            "Biber Comparison",
+            "Biber vs All Docs",
             br(),
             fluidRow(
               column(6,
@@ -212,80 +219,43 @@ resultsUI <- function(id) {
             )
           ),
 
-          # Tab 7: By Category (Aggregated) ----
+          # Tab 7: Text Types ----
           tabPanel(
-            "By Category",
+            "Text Types",
             br(),
-            h4("📊 Aggregated Results by Metadata Category"),
-
-            # Category Summary Table
-            fluidRow(
-              column(12,
-                     h5("Category Summary Table"),
-                     DT::dataTableOutput(ns("aggregated_table")),
-                     br()
-              )
-            ),
-
-            hr(),
-
-            # Average Dimension Scores
-            h5("Average Dimension Scores by Category"),
-            fluidRow(
-              column(9,
-                     plotlyOutput(ns("aggregated_dimension_plot"), height = "450px")
-              ),
-              column(3,
-                     selectInput(
-                       ns("categories_to_compare"),
-                       "Select categories:",
-                       choices = NULL,
-                       multiple = TRUE
-                     ),
-                     checkboxInput(
-                       ns("show_individual_docs"),
-                       "Show individual documents",
-                       value = FALSE
-                     )
-              )
-            ),
-
-            hr(),
-
-            # Biber Comparison Section
-            h5("Compare Categories to Biber Reference Genres"),
             fluidRow(
               column(6,
-                     selectInput(
-                       ns("biber_categories_select"),
-                       "Select categories to compare (up to 10):",
-                       choices = NULL,
-                       multiple = TRUE
-                     )
+                     plotlyOutput(ns("text_type_plot"), height = "400px")
               ),
               column(6,
-                     radioButtons(
-                       ns("biber_category_mode"),
-                       "Comparison mode:",
-                       choices = c(
-                         "Category averages only" = "avg_only",
-                         "Category + individual docs" = "with_docs"
-                       ),
-                       selected = "avg_only"
+                     h4("Text Type Descriptions"),
+                     div(
+                       style = "max-height: 400px; overflow-y: auto; padding: 10px;",
+                       tags$dl(
+                         tags$dt("Intimate interpersonal interaction"),
+                         tags$dd("Private conversations, high involvement, immediate context"),
+                         tags$dt("Informational interaction"),
+                         tags$dd("Public conversations, informational focus"),
+                         tags$dt("Scientific exposition"),
+                         tags$dd("Academic prose, technical descriptions, impersonal"),
+                         tags$dt("Learned exposition"),
+                         tags$dd("Academic prose, abstract concepts, formal"),
+                         tags$dt("Imaginative narrative"),
+                         tags$dd("Fiction, creative writing, narrative focus"),
+                         tags$dt("General narrative exposition"),
+                         tags$dd("Non-fiction narrative, reportage style"),
+                         tags$dt("Situated reportage"),
+                         tags$dd("News reporting, immediate context"),
+                         tags$dt("Involved persuasion"),
+                         tags$dd("Editorials, persuasive essays, personal stance")
+                       )
                      )
-              )
-            ),
-
-            fluidRow(
-              column(12,
-                     plotOutput(ns("biber_category_plot"), height = "600px")
               )
             )
           )
-
-        )  # End tabsetPanel
-      )    # End box
-    ),     # End fluidRow (Main results tabs)
+        ) # End tabsetPanel
+      )   # End box
+    ),    # End fluidRow (Main results tabs)
 
     # Interpretation guide
     fluidRow(

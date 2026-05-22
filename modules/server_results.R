@@ -237,7 +237,13 @@ resultsServer <- function(id, processing_module) {
         )
     })
 
-    # Update category selectors ----
+    # Dimension Heatmap ----
+    output$dimension_heatmap <- renderPlot({
+      req(aggregated_data())
+
+      plot_dimension_heatmap(aggregated_data())
+    })
+
     # Update category selectors ----
     observe({
       req(aggregated_data())
@@ -258,36 +264,7 @@ resultsServer <- function(id, processing_module) {
                         selected = all_categories[1])
     })
 
-    # Aggregated Dimension Plot ----
-    output$aggregated_dimension_plot <- renderPlotly({
-      req(aggregated_data(), input$aggregated_plot_type)
 
-      if (input$aggregated_plot_type == "categories") {
-        # Compare multiple categories
-        req(input$categories_to_compare)
-
-        plot_data_agg <- aggregated_data() %>%
-          filter(metadata %in% input$categories_to_compare)
-
-        plot_aggregated_dimensions(plot_data_agg, interactive = TRUE)
-
-      } else {
-        # Show single category with individual docs
-        req(input$category_with_docs)
-
-        plot_data_agg <- aggregated_data() %>%
-          filter(metadata == input$category_with_docs)
-
-        plot_data_ind <- results_data() %>%
-          filter(metadata == input$category_with_docs)
-
-        plot_aggregated_dimensions_with_docs(
-          plot_data_agg,
-          plot_data_ind,
-          interactive = TRUE
-        )
-      }
-    })
 
     # Aggregated Dimension Plot ----
     output$aggregated_dimension_plot <- renderPlotly({
