@@ -1,7 +1,7 @@
 # MDA Tagger
 Multi-Dimensional Analysis toolkit for linguistic corpus analysis based on Biber (1988).
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - R ≥ 4.0.0
@@ -40,7 +40,8 @@ shiny::runApp()
 ```
 The app will open in your browser. You do not need to install anything else.
 
-## 📁 Project Structure
+##  Project Structure
+
 mda_app/
 ├── app.R              # Main Shiny app
 ├── global.R           # Setup & configuration
@@ -50,17 +51,17 @@ mda_app/
 ├── www/               # Web assets (CSS, images)
 └── tests/             # Unit tests
 
-## 🔧 Development
+##  Development
 
 ### Building Incrementally
 Files are being added incrementally. Track progress:
 - [x] Project setup
 - [x] Folder structure
-- [ ] Core utility functions
-- [ ] Data input module
-- [ ] Processing module
-- [ ] Visualization module
-- [ ] Export functionality
+- [x] Core utility functions
+- [x] Data input module
+- [x] Processing module
+- [x] Visualization module
+- [x] Export functionality
 
 ### Testing Locally
 ```r
@@ -71,7 +72,7 @@ source("modules/ui_data_input.R")
 source("modules/server_data_input.R")
 ```
 
-## 📊 Features
+##  Features
 - Multi-format file upload (TXT, CSV, DOCX)
 - Corpus metadata management
 - POS tagging with UDPipe
@@ -80,13 +81,13 @@ source("modules/server_data_input.R")
 - Text type classification
 - Interactive visualizations
 
-## 🤝 Contributing
+##  Contributing
 This is an active development project. Stay tuned for updates!
 
-## 📄 License
+##  License
 MIT License - see LICENSE file
 
-## 📚 Citation
+## Citation
 
 If you use this app in your research, please cite it as follows:
 
