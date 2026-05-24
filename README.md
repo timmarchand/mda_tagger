@@ -62,6 +62,8 @@ Files are being added incrementally. Track progress:
 - [x] Processing module
 - [x] Visualization module
 - [x] Export functionality
+- [ ] KWIC concordancing of tags
+- [ ] Export of R code for plots
 
 ### Testing Locally
 ```r
