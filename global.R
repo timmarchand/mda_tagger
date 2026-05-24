@@ -39,21 +39,20 @@ cat("═════════════════════════
 cat("📊 Loading reference data...\n")
 
 # Load sh regex patterns
-if (file.exists("data/sh.rds")) {
-  sh <- readRDS("data/sh.rds")
-  cat("   ✓ sh patterns loaded (", length(sh), " patterns)\n", sep = "")
-} else {
-  stop("❌ data/sh.rds not found. Run data/create_sh.R first.")
+if (!file.exists("data/sh.rds")) {
+  cat("   ⚠️  data/sh.rds not found — generating...\n")
+  source("data/create_sh.R")
 }
+sh <- readRDS("data/sh.rds")
+cat("   ✓ sh patterns loaded (", length(sh), " patterns)\n", sep = "")
 
 # Load biber_base statistics
-if (file.exists("data/biber_base.rds")) {
-  biber_base <- readRDS("data/biber_base.rds")
-  cat("   ✓ biber_base loaded (", nrow(biber_base), " features)\n", sep = "")
-} else {
-  stop("❌ data/biber_base.rds not found. Run data/create_biber_base.R first.")
+if (!file.exists("data/biber_base.rds")) {
+  cat("   ⚠️  data/biber_base.rds not found — generating...\n")
+  source("data/create_biber_base.R")
 }
-
+biber_base <- readRDS("data/biber_base.rds")
+cat("   ✓ biber_base loaded (", nrow(biber_base), " features)\n", sep = "")
 # ==== Source Functions ====
 cat("🔧 Loading functions...\n")
 source("R/05_file_helpers.R")
@@ -100,5 +99,9 @@ cat("   ✓ Results module loaded\n")
 source("modules/ui_export.R")
 source("modules/server_export.R")
 cat("   ✓ Export module loaded\n")
+
+source("modules/ui_kwic.R")
+source("modules/server_kwic.R")
+cat("   ✓ KWIC module loaded\n")
 
 

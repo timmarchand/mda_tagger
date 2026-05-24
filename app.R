@@ -18,7 +18,8 @@ ui <- dashboardPage(
       menuItem("1. Upload Data", tabName = "upload", icon = icon("upload")),
       menuItem("2. Process & Tag", tabName = "process", icon = icon("cogs")),
       menuItem("3. Results", tabName = "results", icon = icon("chart-bar")),
-      menuItem("4. Export", tabName = "export", icon = icon("download"))
+      menuItem("4. KWIC", tabName = "kwic", icon = icon("search")),
+      menuItem("5. Export", tabName = "export", icon = icon("download"))
     ),
     hr(),
     div(
@@ -69,7 +70,10 @@ ui <- dashboardPage(
         resultsUI("results")
       ),
 
-      # Tab 4: Export ----
+      # Tab 4: KWIC ----
+      tabItem(tabName = "kwic", kwicUI("kwic")),
+
+      # Tab 5: Export ----
       tabItem(
         tabName = "export",
         h2("💾 Export Results"),
@@ -94,6 +98,9 @@ server <- function(input, output, session) {
 
   # Call results module
   resultsServer("results", processing_module)
+
+  # Call KWIC module
+  kwicServer("kwic", processing_module = processing_results)
 
   # Call export module
   exportServer("export", processing_module)
