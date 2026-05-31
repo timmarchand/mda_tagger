@@ -53,18 +53,20 @@ dataInputServer <- function(id) {
       columns <- names(uploaded_data()$content)
       df <- uploaded_data()$content
 
-      # Count unique values per column
-      column_info <- sapply(columns, function(col) {
-        length(unique(df[[col]]))
-      })
-
+      # Only check character/factor columns excluding text column for cardinality warning
+      candidate_meta_cols <- setdiff(columns, columns[1])
+      candidate_meta_cols <- candidate_meta_cols[sapply(candidate_meta_cols, function(col) {
+        is.character(df[[col]]) || is.factor(df[[col]])
+      })]
+      column_info <- sapply(candidate_meta_cols, function(col) length(unique(df[[col]])))
       high_cardinality_cols <- names(column_info)[column_info > 20]
 
       tagList(
         hr(),
         h5("📋 Column Selection"),
-        p("Choose which columns contain your text and metadata:"),
+        p("Choose which columns contain your text, document IDs, and metadata:"),
 
+        # 1. Text column
         selectInput(
           session$ns("text_column"),
           "Text Column:",
@@ -72,6 +74,15 @@ dataInputServer <- function(id) {
           selected = columns[1]
         ),
 
+        # 2. Document ID column
+        selectInput(
+          session$ns("doc_id_column"),
+          "Document ID Column (optional):",
+          choices = c("Auto-generate" = "", columns),
+          selected = ""
+        ),
+
+        # 3. Metadata column
         selectInput(
           session$ns("meta_column"),
           "Metadata Column(s) (optional):",
@@ -80,24 +91,25 @@ dataInputServer <- function(id) {
           selected = NULL
         ),
 
-        # Add metadata value filter
-        conditionalPanel(
-          condition = paste0("input['", session$ns("meta_column"), "'] != null && input['", session$ns("meta_column"), "'].length > 0"),
-          br(),
-          uiOutput(session$ns("meta_value_filter_ui"))
-        ),
-
+        # Warning only for high-cardinality metadata candidates
         if (length(high_cardinality_cols) > 0) {
           div(
             style = "margin-top: 10px; padding: 10px; background-color: #fff3cd; border-radius: 4px;",
             HTML(paste0(
-              "<strong>⚠️ Performance Warning:</strong><br/>",
-              "These columns have >20 unique values: ",
+              "<strong>⚠️ Metadata Warning:</strong><br/>",
+              "These columns have >20 unique values and may not be suitable as metadata categories: ",
               "<strong>", paste(high_cardinality_cols, collapse = ", "), "</strong><br/>",
-              "Consider using columns with fewer categories."
+              "Metadata works best with a small number of distinct category labels."
             ))
           )
-        }
+        },
+
+        # Metadata value filter
+        conditionalPanel(
+          condition = paste0("input['", session$ns("meta_column"), "'] != null && input['", session$ns("meta_column"), "'].length > 0"),
+          br(),
+          uiOutput(session$ns("meta_value_filter_ui"))
+        )
       )
     })
 
@@ -430,6 +442,7 @@ dataInputServer <- function(id) {
 
         # Generate text data first
         text_data <- as.character(df[[input$text_column]])
+        keep_rows <- rep(TRUE, nrow(df))  # default — keep all rows
 
         # Get metadata
         if (!is.null(input$meta_column) && length(input$meta_column) > 0) {
@@ -463,7 +476,12 @@ dataInputServer <- function(id) {
         }
 
         # Generate doc_ids AFTER filtering
-        doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
+        if (!is.null(input$doc_id_column) && nchar(input$doc_id_column) > 0) {
+          doc_ids <- as.character(df[[input$doc_id_column]])[keep_rows]
+          doc_ids <- str_replace_all(doc_ids, "[^A-Za-z0-9_-]", "_")
+        } else {
+          doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
+        }
 
         return(list(
           text = text_data,
