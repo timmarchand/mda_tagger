@@ -3,91 +3,128 @@
 # MDA Tagger - Full Tagging Pipeline
 # Exported from MDA Tagger app (https://github.com/timmarchand/mda_tagger)
 # =============================================================================
-# This script runs the full tagging pipeline:
-#   1. Load raw tokenised data
-#   2. POS tag with UDPipe
-#   3. Extract MDA linguistic features
-#   4. Score texts on Biber's 5 dimensions
+# This script runs the full MDA tagging pipeline on your text data:
+#   1. Load text data from the data/ folder
+#   2. Source pipeline functions from GitHub
+#   3. Initialize UDPipe POS tagging model
+#   4. Run full MDA analysis (POS tagging + feature extraction + dimension scoring)
+#   5. Explore and export results
+#
+# REQUIREMENTS:
+#   install.packages(c("udpipe", "tidyverse", "data.table"))
 # =============================================================================
 
-# ---- 1. Install / load packages ----
-# Run install.packages() for any packages you are missing:
-# install.packages(c("udpipe", "tidyverse", "data.table"))
-
+# ---- 1. Load packages ----
 library(udpipe)
 library(dplyr)
+library(tidyr)
+library(purrr)
 library(stringr)
 library(readr)
-library(purrr)
 library(tibble)
 
 # ---- 2. Load data ----
 # Paths are relative to the project root — open the .Rproj file first
-tokenised <- read_csv("data/tokenised_data.csv")
-tagged    <- read_csv("data/tagged_data.csv")  # pre-tagged; use section 3 to re-tag
+text_data <- read_csv("data/text_data.csv")
+tagged    <- read_csv("data/tagged_data.csv")  # pre-tagged export from app
 
-cat("Loaded", nrow(tokenised), "documents\n")
-cat("Columns:", paste(names(tokenised), collapse = ", "), "\n")
+cat("Loaded", nrow(text_data), "documents\n")
+cat("Columns:", paste(names(text_data), collapse = ", "), "\n")
 
-# ---- 3. (Optional) Re-tag with UDPipe ----
-# Skip this section if you want to work with the pre-tagged data above.
+# ---- 3. Source pipeline functions from GitHub ----
+# Requires an internet connection.
 
-# Download the UDPipe model (first time only, ~20MB):
-# udpipe_download_model(language = "english-ewt", model_dir = ".")
+cat("Sourcing pipeline functions from GitHub...\n")
 
-model_file <- list.files(".", pattern = "\\.udpipe$", full.names = TRUE)[1]
+base_url <- "https://raw.githubusercontent.com/timmarchand/mda_tagger/main/R"
 
-if (is.na(model_file)) {
-  stop("No UDPipe model found. Run udpipe_download_model(language = 'english-ewt') first.")
-}
+source(paste0(base_url, "/01_utils.R"))
+cat("   ✓ Utility functions loaded\n")
 
-udmodel <- udpipe_load_model(model_file)
-cat("UDPipe model loaded:", model_file, "\n")
+source(paste0(base_url, "/02_pipeline.R"))
+cat("   ✓ Pipeline functions loaded\n")
 
-# Tag each document
-pos_tag_text <- function(text, doc_id, model) {
-  result <- udpipe_annotate(model, x = text, doc_id = doc_id)
-  as_tibble(result)
-}
+source(paste0(base_url, "/03_analysis.R"))
+cat("   ✓ Analysis functions loaded\n")
 
-tagged_raw <- map2_dfr(
-  tokenised$text,
-  tokenised$doc_id,
-  ~ pos_tag_text(.x, .y, udmodel)
+# ---- 4. Load reference data from GitHub ----
+# sh regex patterns and Biber base statistics are generated
+# by sourcing the creation scripts directly from GitHub
+
+cat("Loading sh patterns...\n")
+source("https://raw.githubusercontent.com/timmarchand/mda_tagger/main/data/create_sh.R")
+cat("   ✓ sh patterns loaded (", length(sh), "patterns)\n")
+
+cat("Loading Biber base statistics...\n")
+source("https://raw.githubusercontent.com/timmarchand/mda_tagger/main/data/create_biber_base.R")
+cat("   ✓ biber_base loaded (", nrow(biber_base), "features)\n")
+
+# ---- 5. Initialize UDPipe model ----
+# Downloads the model on first run (~20MB), then loads it.
+# The model file will be saved in your current working directory.
+
+init_udpipe_model()
+
+# ---- 6. Run full MDA analysis ----
+# This re-tags your texts from scratch using the full pipeline:
+#   POS tagging → MDA feature extraction → dimension scoring
+
+cat("\nRunning MDA analysis on", nrow(text_data), "texts...\n")
+
+results <- mda_analysis(
+  texts    = text_data$text,
+  doc_ids  = text_data$doc_id,
+  metadata = text_data$metadata
 )
 
-cat("POS tagging complete:", nrow(tagged_raw), "tokens\n")
+cat("\n✅ Analysis complete!\n")
+cat("Results:", nrow(results), "documents,", ncol(results), "columns\n")
+glimpse(results)
 
-# ---- 4. Inspect tagged data ----
-# The tagged_data.csv exported from the app has these key columns:
-#   doc_id       - document identifier
-#   tagged_text  - full tagged text (word_POS<MDA> format)
-#   metadata     - category/group label
-#   dim1..dim5   - Biber dimension scores
-#   [feature columns] - individual feature counts per 1000 words
+# ---- 7. Compare with app results ----
+# Check how your re-tagged results compare to the app export
 
-glimpse(tagged)
+if (nrow(results) == nrow(tagged)) {
+  cat("\nDimension score comparison (re-tagged vs app export):\n")
+  for (dim in paste0("Dimension", 1:5)) {
+    if (dim %in% names(results) && dim %in% names(tagged)) {
+      cor_val <- cor(results[[dim]], tagged[[dim]], use = "complete.obs")
+      cat("  ", dim, "correlation:", round(cor_val, 4), "\n")
+    }
+  }
+}
 
-# ---- 5. Example: filter by metadata group ----
-# Replace "Academic" with your own category label
-group1 <- tagged |> filter(metadata == unique(tagged$metadata)[1])
-cat("Group 1 (", unique(tagged$metadata)[1], "):", nrow(group1), "documents\n")
+# ---- 8. Example: filter by metadata group ----
+group1 <- results |> filter(metadata == unique(results$metadata)[1])
+cat("\nGroup 1 (", unique(results$metadata)[1], "):", nrow(group1), "documents\n")
 
-# ---- 6. Example: compare dimension scores across groups ----
-tagged |>
+# ---- 9. Example: compare dimension scores across groups ----
+results |>
   group_by(metadata) |>
   summarise(
-    across(starts_with("dim"), list(mean = mean, sd = sd), .names = "{.col}_{.fn}"),
+    across(starts_with("Dimension"), list(mean = mean, sd = sd),
+           .names = "{.col}_{.fn}"),
     n = n()
   ) |>
   print()
 
-# ---- 7. Example: extract a single feature across documents ----
-# Replace "NN" with any feature column name from your data
-if ("NN" %in% names(tagged)) {
-  tagged |>
-    select(doc_id, metadata, NN) |>
-    arrange(desc(NN)) |>
+# ---- 10. Example: explore feature columns ----
+feature_cols <- setdiff(names(results),
+                        c("doc_id", "metadata", "n_words", "tagged_text",
+                          "closest_text_type", paste0("Dimension", 1:5)))
+
+if (length(feature_cols) > 0) {
+  cat("\nAvailable feature columns:\n")
+  cat(paste(feature_cols, collapse = ", "), "\n")
+
+  # Show top 10 documents by first feature
+  results |>
+    select(doc_id, metadata, all_of(feature_cols[1])) |>
+    arrange(desc(.data[[feature_cols[1]]])) |>
     head(10) |>
     print()
 }
+
+# ---- 11. Save results ----
+# Uncomment to save re-tagged results to CSV
+# write_csv(results, "data/retagged_results.csv")
