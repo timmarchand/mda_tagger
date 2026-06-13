@@ -60,24 +60,22 @@ exportServer <- function(id, processing_module) {
         paste0("mda_tables_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
       },
       content = function(file) {
-        req(results_data(), input$tables_to_export)
-        wb <- openxlsx::createWorkbook()
-        if ("full" %in% input$tables_to_export) {
-          openxlsx::addWorksheet(wb, "Full Results")
-          openxlsx::writeData(wb, "Full Results", results_data())
-        }
-        if ("aggregated" %in% input$tables_to_export) {
-          agg_data <- aggregate_by_metadata(results_data())
-          openxlsx::addWorksheet(wb, "Aggregated")
-          openxlsx::writeData(wb, "Aggregated", agg_data)
-        }
-        if ("summary" %in% input$tables_to_export) {
-          summary_data <- summarize_dimensions(results_data(), group_by = "metadata")
-          openxlsx::addWorksheet(wb, "Summary Statistics")
-          openxlsx::writeData(wb, "Summary Statistics", summary_data)
-        }
-        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
-      }
+  req(results_data(), input$tables_to_export)
+
+  sheets <- list()
+
+  if ("full" %in% input$tables_to_export) {
+    sheets[["Full Results"]] <- results_data()
+  }
+  if ("aggregated" %in% input$tables_to_export) {
+    sheets[["Aggregated"]] <- aggregate_by_metadata(results_data())
+  }
+  if ("summary" %in% input$tables_to_export) {
+    sheets[["Summary Statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
+  }
+
+  writexl::write_xlsx(sheets, path = file)
+}
     )
 
     # ---- Download Plot ----
