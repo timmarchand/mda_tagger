@@ -24,7 +24,7 @@ dataInputServer <- function(id) {
       }
 
       # Single file upload
-      if (input$input_method == "single") {  # ← Changed from "file"
+      if (input$input_method == "single") {
         req(input$upload_csv)
         result <- read_uploaded_file(
           input$upload_csv,
@@ -53,18 +53,22 @@ dataInputServer <- function(id) {
       columns <- names(uploaded_data()$content)
       df <- uploaded_data()$content
 
-      # Count unique values per column
-      column_info <- sapply(columns, function(col) {
-        length(unique(df[[col]]))
-      })
-
+      # Only check character/factor columns excluding the text column for
+      # cardinality warning — the text column will almost always have high
+      # cardinality and isn't a meaningful metadata candidate.
+      candidate_meta_cols <- setdiff(columns, columns[1])
+      candidate_meta_cols <- candidate_meta_cols[sapply(candidate_meta_cols, function(col) {
+        is.character(df[[col]]) || is.factor(df[[col]])
+      })]
+      column_info <- sapply(candidate_meta_cols, function(col) length(unique(df[[col]])))
       high_cardinality_cols <- names(column_info)[column_info > 20]
 
       tagList(
         hr(),
         h5("📋 Column Selection"),
-        p("Choose which columns contain your text and metadata:"),
+        p("Choose which columns contain your text, document IDs, and metadata:"),
 
+        # 1. Text column
         selectInput(
           session$ns("text_column"),
           "Text Column:",
@@ -72,6 +76,15 @@ dataInputServer <- function(id) {
           selected = columns[1]
         ),
 
+        # 2. Document ID column
+        selectInput(
+          session$ns("doc_id_column"),
+          "Document ID Column (optional):",
+          choices = c("Auto-generate" = "", columns),
+          selected = ""
+        ),
+
+        # 3. Metadata column
         selectInput(
           session$ns("meta_column"),
           "Metadata Column(s) (optional):",
@@ -80,35 +93,35 @@ dataInputServer <- function(id) {
           selected = NULL
         ),
 
-        # Add metadata value filter
-        conditionalPanel(
-          condition = paste0("input['", session$ns("meta_column"), "'] != null && input['", session$ns("meta_column"), "'].length > 0"),
-          br(),
-          uiOutput(session$ns("meta_value_filter_ui"))
-        ),
-
+        # Warning only for high-cardinality metadata candidates
         if (length(high_cardinality_cols) > 0) {
           div(
             style = "margin-top: 10px; padding: 10px; background-color: #fff3cd; border-radius: 4px;",
             HTML(paste0(
-              "<strong>⚠️ Performance Warning:</strong><br/>",
-              "These columns have >20 unique values: ",
+              "<strong>⚠️ Metadata Warning:</strong><br/>",
+              "These columns have >20 unique values and may not be suitable as metadata categories: ",
               "<strong>", paste(high_cardinality_cols, collapse = ", "), "</strong><br/>",
-              "Consider using columns with fewer categories."
+              "Metadata works best with a small number of distinct category labels."
             ))
           )
-        }
+        },
+
+        # Metadata value filter
+        conditionalPanel(
+          condition = paste0("input['", session$ns("meta_column"), "'] != null && input['", session$ns("meta_column"), "'].length > 0"),
+          br(),
+          uiOutput(session$ns("meta_value_filter_ui"))
+        )
       )
     })
 
     # Update meta column choices based on text column selection
     observe({
-      req(input$input_method)  # ← Add this
+      req(input$input_method)
       if (input$input_method != "single") return()
       if (is.null(uploaded_data())) return()
       if (uploaded_data()$type != "csv") return()
       if (is.null(input$text_column)) return()
-
 
       all_columns <- names(uploaded_data()$content)
       available_meta_columns <- setdiff(all_columns, input$text_column)
@@ -140,16 +153,22 @@ dataInputServer <- function(id) {
       # If multiple meta columns selected, combine them
       if (length(input$meta_column) > 1) {
         combined_values <- apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
-        unique_values <- unique(combined_values)
       } else {
-        unique_values <- unique(df[[input$meta_column]])
+        combined_values <- df[[input$meta_column]]
       }
 
       # Sort and get counts
-      value_counts <- table(if (length(input$meta_column) > 1) combined_values else df[[input$meta_column]])
+      value_counts <- table(combined_values)
       value_counts <- sort(value_counts, decreasing = TRUE)
 
-      # Create choices with counts
+      # Create choices with counts — guard against no values to filter on
+      if (length(value_counts) == 0) {
+        return(div(
+          class = "alert alert-warning",
+          "Selected metadata column has no values to filter."
+        ))
+      }
+
       choices_with_counts <- setNames(
         names(value_counts),
         paste0(names(value_counts), " (n=", value_counts, ")")
@@ -213,12 +232,10 @@ dataInputServer <- function(id) {
 
     # Corpus Metadata UI ----
     output$corpus_metadata_container <- renderUI({
-      req(input$input_method)  # ← Add this
+      req(input$input_method)
       if (input$input_method != "corpus") return(NULL)
       if (is.null(input$upload_corpus)) return(NULL)
       if (nrow(input$upload_corpus) == 0) return(NULL)
-
-      # ... rest of code
 
       files <- input$upload_corpus
 
@@ -243,29 +260,29 @@ dataInputServer <- function(id) {
 
             fluidRow(
               column(4,
-                textInput(session$ns("bulk_meta_label"),
-                         "Bulk Label:",
-                         placeholder = "e.g., Academic, News")
+                     textInput(session$ns("bulk_meta_label"),
+                               "Bulk Label:",
+                               placeholder = "e.g., Academic, News")
               ),
               column(4,
-                numericInput(session$ns("bulk_start"),
-                           "From file #:",
-                           value = 1, min = 1, step = 1)
+                     numericInput(session$ns("bulk_start"),
+                                  "From file #:",
+                                  value = 1, min = 1, step = 1)
               ),
               column(4,
-                numericInput(session$ns("bulk_end"),
-                           "To file #:",
-                           value = nrow(files), min = 1, step = 1)
+                     numericInput(session$ns("bulk_end"),
+                                  "To file #:",
+                                  value = nrow(files), min = 1, step = 1)
               )
             ),
 
             div(style = "text-align: center; margin-top: 10px;",
-              actionButton(session$ns("apply_bulk"),
-                          "Apply to Range",
-                          class = "btn-info btn-sm"),
-              actionButton(session$ns("apply_all"),
-                          "Apply to All",
-                          class = "btn-warning btn-sm")
+                actionButton(session$ns("apply_bulk"),
+                             "Apply to Range",
+                             class = "btn-info btn-sm"),
+                actionButton(session$ns("apply_all"),
+                             "Apply to All",
+                             class = "btn-warning btn-sm")
             )
           ),
 
@@ -281,20 +298,20 @@ dataInputServer <- function(id) {
                 style = "margin-bottom: 8px; padding: 8px; border: 1px solid #e0e0e0; border-radius: 3px;",
                 fluidRow(
                   column(1,
-                    div(style = "text-align: center; font-weight: bold; color: #666; padding-top: 5px;",
-                        paste0("#", i))
+                         div(style = "text-align: center; font-weight: bold; color: #666; padding-top: 5px;",
+                             paste0("#", i))
                   ),
                   column(5,
-                    div(style = "font-size: 13px; color: #333; padding-top: 5px; word-break: break-all;",
-                        files$name[i])
+                         div(style = "font-size: 13px; color: #333; padding-top: 5px; word-break: break-all;",
+                             files$name[i])
                   ),
                   column(6,
-                    textInput(
-                      session$ns(paste0("meta_", i)),
-                      label = NULL,
-                      value = filename_base,
-                      placeholder = "Enter category"
-                    )
+                         textInput(
+                           session$ns(paste0("meta_", i)),
+                           label = NULL,
+                           value = filename_base,
+                           placeholder = "Enter category"
+                         )
                   )
                 )
               )
@@ -303,13 +320,13 @@ dataInputServer <- function(id) {
 
           br(),
           div(style = "text-align: center;",
-            actionButton(session$ns("update_metadata"),
-                        "✅ Confirm Metadata",
-                        class = "btn-success"),
-            tags$span(style = "margin: 0 10px;"),
-            actionButton(session$ns("reset_metadata"),
-                        "🔄 Reset to Filenames",
-                        class = "btn-outline-secondary btn-sm")
+              actionButton(session$ns("update_metadata"),
+                           "✅ Confirm Metadata",
+                           class = "btn-success"),
+              tags$span(style = "margin: 0 10px;"),
+              actionButton(session$ns("reset_metadata"),
+                           "🔄 Reset to Filenames",
+                           class = "btn-outline-secondary btn-sm")
           )
         )
       )
@@ -330,7 +347,7 @@ dataInputServer <- function(id) {
 
       for (i in start_idx:end_idx) {
         updateTextInput(session, paste0("meta_", i),
-                       value = trimws(input$bulk_meta_label))
+                        value = trimws(input$bulk_meta_label))
       }
 
       showNotification(
@@ -350,7 +367,7 @@ dataInputServer <- function(id) {
       files <- input$upload_corpus
       for (i in 1:nrow(files)) {
         updateTextInput(session, paste0("meta_", i),
-                       value = trimws(input$bulk_meta_label))
+                        value = trimws(input$bulk_meta_label))
       }
 
       showNotification(
@@ -423,13 +440,15 @@ dataInputServer <- function(id) {
       }
 
       # For CSV - need column selection
-      # For CSV - need column selection
       if (uploaded_data()$type == "csv") {
         req(input$text_column)
         df <- uploaded_data()$content
 
         # Generate text data first
         text_data <- as.character(df[[input$text_column]])
+
+        # Define keep_rows upfront — default to keeping all rows
+        keep_rows <- rep(TRUE, length(text_data))
 
         # Get metadata
         if (!is.null(input$meta_column) && length(input$meta_column) > 0) {
@@ -463,7 +482,12 @@ dataInputServer <- function(id) {
         }
 
         # Generate doc_ids AFTER filtering
-        doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
+        if (!is.null(input$doc_id_column) && nchar(input$doc_id_column) > 0) {
+          doc_ids <- as.character(df[[input$doc_id_column]])[keep_rows]
+          doc_ids <- str_replace_all(doc_ids, "[^A-Za-z0-9_-]", "_")
+        } else {
+          doc_ids <- paste0("doc_", sprintf("%03d", seq_along(text_data)))
+        }
 
         return(list(
           text = text_data,
