@@ -106,25 +106,28 @@ server <- function(input, output, session) {
   exportServer("export", processing_module)
 
   # Monitor when data is confirmed
-  observe({
-    if (!is.null(data_module$data_confirmed()) && data_module$data_confirmed()) {
-      data <- data_module$selected_text_and_meta()
+  prev_confirmed <- reactiveVal(FALSE)
 
+  observeEvent(data_module$data_confirmed(), {
+    confirmed_now <- isTRUE(data_module$data_confirmed())
+
+    if (confirmed_now && !isolate(prev_confirmed())) {
+      data <- isolate(data_module$selected_text_and_meta())
       cat("\n✅ Data confirmed!\n")
       cat("  Texts:", length(data$text), "\n")
       cat("  Doc IDs:", paste(head(data$doc_ids, 3), collapse = ", "), "...\n")
       cat("  Metadata:", paste(head(unique(data$meta), 3), collapse = ", "), "\n\n")
-
       # Auto-switch to processing tab
       updateTabItems(session, "tabs", "process")
-
       showNotification(
         "Data loaded! Switched to Processing tab.",
         type = "message",
         duration = 3
       )
     }
-  })
+
+    prev_confirmed(confirmed_now)
+  }, ignoreInit = TRUE)
 
   # Monitor processing completion
   observe({
