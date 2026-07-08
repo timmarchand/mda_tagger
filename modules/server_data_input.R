@@ -24,7 +24,7 @@ dataInputServer <- function(id) {
       }
 
       # Single file upload
-      if (input$input_method == "single") {  # ← Changed from "file"
+      if (input$input_method == "single") {
         req(input$upload_csv)
         result <- read_uploaded_file(
           input$upload_csv,
@@ -53,7 +53,9 @@ dataInputServer <- function(id) {
       columns <- names(uploaded_data()$content)
       df <- uploaded_data()$content
 
-      # Only check character/factor columns excluding text column for cardinality warning
+      # Only check character/factor columns excluding the text column for
+      # cardinality warning — the text column will almost always have high
+      # cardinality and isn't a meaningful metadata candidate.
       candidate_meta_cols <- setdiff(columns, columns[1])
       candidate_meta_cols <- candidate_meta_cols[sapply(candidate_meta_cols, function(col) {
         is.character(df[[col]]) || is.factor(df[[col]])
@@ -115,12 +117,11 @@ dataInputServer <- function(id) {
 
     # Update meta column choices based on text column selection
     observe({
-      req(input$input_method)  # ← Add this
+      req(input$input_method)
       if (input$input_method != "single") return()
       if (is.null(uploaded_data())) return()
       if (uploaded_data()$type != "csv") return()
       if (is.null(input$text_column)) return()
-
 
       all_columns <- names(uploaded_data()$content)
       available_meta_columns <- setdiff(all_columns, input$text_column)
@@ -152,16 +153,22 @@ dataInputServer <- function(id) {
       # If multiple meta columns selected, combine them
       if (length(input$meta_column) > 1) {
         combined_values <- apply(df[, input$meta_column, drop = FALSE], 1, paste, collapse = " | ")
-        unique_values <- unique(combined_values)
       } else {
-        unique_values <- unique(df[[input$meta_column]])
+        combined_values <- df[[input$meta_column]]
       }
 
       # Sort and get counts
-      value_counts <- table(if (length(input$meta_column) > 1) combined_values else df[[input$meta_column]])
+      value_counts <- table(combined_values)
       value_counts <- sort(value_counts, decreasing = TRUE)
 
-      # Create choices with counts
+      # Create choices with counts — guard against no values to filter on
+      if (length(value_counts) == 0) {
+        return(div(
+          class = "alert alert-warning",
+          "Selected metadata column has no values to filter."
+        ))
+      }
+
       choices_with_counts <- setNames(
         names(value_counts),
         paste0(names(value_counts), " (n=", value_counts, ")")
@@ -225,12 +232,10 @@ dataInputServer <- function(id) {
 
     # Corpus Metadata UI ----
     output$corpus_metadata_container <- renderUI({
-      req(input$input_method)  # ← Add this
+      req(input$input_method)
       if (input$input_method != "corpus") return(NULL)
       if (is.null(input$upload_corpus)) return(NULL)
       if (nrow(input$upload_corpus) == 0) return(NULL)
-
-      # ... rest of code
 
       files <- input$upload_corpus
 
@@ -435,14 +440,15 @@ dataInputServer <- function(id) {
       }
 
       # For CSV - need column selection
-      # For CSV - need column selection
       if (uploaded_data()$type == "csv") {
         req(input$text_column)
         df <- uploaded_data()$content
 
         # Generate text data first
         text_data <- as.character(df[[input$text_column]])
-        keep_rows <- rep(TRUE, nrow(df))  # default — keep all rows
+
+        # Define keep_rows upfront — default to keeping all rows
+        keep_rows <- rep(TRUE, length(text_data))
 
         # Get metadata
         if (!is.null(input$meta_column) && length(input$meta_column) > 0) {
