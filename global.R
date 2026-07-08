@@ -19,11 +19,10 @@ library(purrr)
 library(stringr)
 library(readr)
 library(tibble)
-library(openxlsx)
+library(writexl)
 library(data.table)
 library(zip)
 library(withr)
-library(pheatmap)
 
 cat("   ✓ Core packages loaded\n")
 

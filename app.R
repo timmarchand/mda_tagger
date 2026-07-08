@@ -100,7 +100,7 @@ server <- function(input, output, session) {
   resultsServer("results", processing_module)
 
   # Call KWIC module
-  kwicServer("kwic", processing_module = processing_results)
+  kwicServer("kwic", processing_module = processing_module)
 
   # Call export module
   exportServer("export", processing_module)

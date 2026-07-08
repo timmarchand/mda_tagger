@@ -30,7 +30,7 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
     ) %>%
     mutate(dimension = gsub("Dimension", "D", dimension))
 
-  # Get number of categories for viridis
+  # Get number of categories for viridisLite
   n_categories <- length(unique(plot_data[[color_by]]))
 
   # Create plot
@@ -38,7 +38,7 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
     geom_boxplot(alpha = 0.8) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.5) +
     facet_wrap(~.data[[color_by]], scales = "free_y") +
-    viridis::scale_fill_viridis(discrete = TRUE, option = "viridis") +
+    viridisLite::scale_fill_viridisLite(discrete = TRUE, option = "viridisLite") +
     theme_minimal() +
     labs(
       title = "Multi-Dimensional Analysis Scores by Category",
@@ -985,7 +985,7 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       geom_violin(alpha = 0.7, trim = FALSE) +
       geom_jitter(width = 0.2, alpha = 0.4, size = 2) +
-      viridis::scale_fill_viridis(discrete = TRUE, option = "viridis") +
+      viridisLite::scale_fill_viridisLite(discrete = TRUE, option = "viridisLite") +
       coord_flip() +
       labs(
         title = paste(dimension, "Distribution by Category"),
@@ -1066,35 +1066,21 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
   #' @param aggregated_data Aggregated data by metadata
   #' @return A pheatmap object
   #' @export
-  plot_dimension_heatmap <- function(aggregated_data) {
-
-    # Prepare matrix for heatmap
-    summary_mat <- aggregated_data %>%
-      select(metadata, Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
-      column_to_rownames(var = "metadata") %>%
-      as.matrix()
-
-    # Calculate max absolute value for symmetric color scale
-    max_abs <- max(abs(summary_mat), na.rm = TRUE)
-    breaks <- seq(-max_abs, max_abs, length.out = 101)
-
-    # Create heatmap
-    pheatmap::pheatmap(
-      summary_mat,
-      cluster_rows = TRUE,
-      cluster_cols = FALSE,
-      display_numbers = TRUE,
-      fontsize_number = 12,
-      fontface_number = "bold",
-      number_format = "%.1f",
-      number_color = "grey20",
-      main = "Mean MDA Scores by Category",
-      color = colorRampPalette(c("#3498DB", "#ECF0F1", "#E74C3C"))(100),
-      breaks = breaks,
-      border_color = "white",
-      cellwidth = 60,
-      cellheight = 35,
-      angle_col = 0,
-      fontsize = 12
-    )
+  plot_dimension_heatmap <- function(results_data) {
+  if (nrow(results_data) < 2) {
+    return(ggplot() +
+      annotate("text", x = 0.5, y = 0.5,
+               label = "Need at least 2 texts for heatmap") +
+      theme_void())
   }
+
+  results_data |>
+    select(doc_id, starts_with("Dimension")) |>
+    pivot_longer(starts_with("Dimension"), names_to = "dimension", values_to = "score") |>
+    ggplot(aes(x = dimension, y = doc_id, fill = score)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "#2c7bb6", mid = "white", high = "#d7191c", midpoint = 0) +
+    labs(x = "Dimension", y = "Document", fill = "Score") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
