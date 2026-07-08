@@ -19,8 +19,6 @@ library(purrr)
 #' @return ggplot2 or plotly object
 #' @export
 plot_dimensions <- function(results_data, color_by = "metadata", interactive = TRUE) {
-
-  # Reshape to long format
   plot_data <- results_data %>%
     select(doc_id, all_of(color_by), Dimension1, Dimension2, Dimension3, Dimension4, Dimension5) %>%
     pivot_longer(
@@ -30,15 +28,11 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
     ) %>%
     mutate(dimension = gsub("Dimension", "D", dimension))
 
-  # Get number of categories for viridisLite
-  n_categories <- length(unique(plot_data[[color_by]]))
-
-  # Create plot
   p <- ggplot(plot_data, aes(x = dimension, y = score, fill = .data[[color_by]])) +
     geom_boxplot(alpha = 0.8) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.5) +
     facet_wrap(~.data[[color_by]], scales = "free_y") +
-    viridisLite::scale_fill_viridisLite(discrete = TRUE, option = "viridisLite") +
+    scale_fill_viridis_d(option = "viridis") +
     theme_minimal() +
     labs(
       title = "Multi-Dimensional Analysis Scores by Category",
@@ -48,7 +42,7 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
     ) +
     theme(
       plot.title = element_text(face = "bold", size = 14),
-      legend.position = "none",  # Remove legend since facets show categories
+      legend.position = "none",
       strip.background = element_rect(fill = "gray90", color = NA),
       strip.text = element_text(face = "bold", size = 11)
     )
@@ -56,10 +50,8 @@ plot_dimensions <- function(results_data, color_by = "metadata", interactive = T
   if (interactive) {
     p <- ggplotly(p)
   }
-
   return(p)
 }
-
 #' Plot dimension distributions
 #'
 #' @param results_data Tibble with dimension scores
@@ -975,17 +967,14 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
                                     dimension = "Dimension1",
                                     color_by = "metadata",
                                     interactive = FALSE) {
-
-    # Prepare data
     plot_data <- results_data %>%
       mutate(score = .data[[dimension]])
 
-    # Create plot
     p <- ggplot(plot_data, aes(x = .data[[color_by]], y = score, fill = .data[[color_by]])) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       geom_violin(alpha = 0.7, trim = FALSE) +
       geom_jitter(width = 0.2, alpha = 0.4, size = 2) +
-      viridisLite::scale_fill_viridisLite(discrete = TRUE, option = "viridisLite") +
+      scale_fill_viridis_d(option = "viridis") +
       coord_flip() +
       labs(
         title = paste(dimension, "Distribution by Category"),
@@ -996,14 +985,13 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
       theme_minimal() +
       theme(
         plot.title = element_text(face = "bold", size = 14),
-        legend.position = "none",  # Categories shown on y-axis
+        legend.position = "none",
         axis.text.y = element_text(size = 11, face = "bold")
       )
 
     if (interactive) {
       p <- ggplotly(p, tooltip = c("y", "fill"))
     }
-
     return(p)
   }
 
@@ -1063,24 +1051,23 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
   }
   #' Plot heatmap of mean dimension scores by category
   #'
-  #' @param aggregated_data Aggregated data by metadata
-  #' @return A pheatmap object
+  #' @param results_data Aggregated data by metadata
+  #' @return A ggplot heatmap object
   #' @export
   plot_dimension_heatmap <- function(results_data) {
-  if (nrow(results_data) < 2) {
-    return(ggplot() +
-      annotate("text", x = 0.5, y = 0.5,
-               label = "Need at least 2 texts for heatmap") +
-      theme_void())
+    if (nrow(results_data) < 2) {
+      return(ggplot() +
+               annotate("text", x = 0.5, y = 0.5,
+                        label = "Need at least 2 texts for heatmap") +
+               theme_void())
+    }
+    results_data |>
+      select(metadata, starts_with("Dimension")) |>
+      pivot_longer(starts_with("Dimension"), names_to = "dimension", values_to = "score") |>
+      ggplot(aes(x = dimension, y = metadata, fill = score)) +
+      geom_tile() +
+      scale_fill_gradient2(low = "#2c7bb6", mid = "white", high = "#d7191c", midpoint = 0) +
+      labs(x = "Dimension", y = "Category", fill = "Score") +
+      theme_minimal(base_size = 11) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
   }
-
-  results_data |>
-    select(doc_id, starts_with("Dimension")) |>
-    pivot_longer(starts_with("Dimension"), names_to = "dimension", values_to = "score") |>
-    ggplot(aes(x = dimension, y = doc_id, fill = score)) +
-    geom_tile() +
-    scale_fill_gradient2(low = "#2c7bb6", mid = "white", high = "#d7191c", midpoint = 0) +
-    labs(x = "Dimension", y = "Document", fill = "Score") +
-    theme_minimal(base_size = 11) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-}
