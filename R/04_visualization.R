@@ -973,7 +973,7 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
     p <- ggplot(plot_data, aes(x = .data[[color_by]], y = score, fill = .data[[color_by]])) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       geom_violin(alpha = 0.7, trim = FALSE) +
-      geom_jitter(width = 0.2, alpha = 0.4, size = 2) +
+      geom_jitter(aes(text = doc_id), width = 0.2, alpha = 0.4, size = 2) +
       scale_fill_viridis_d(option = "viridis") +
       coord_flip() +
       labs(
@@ -990,7 +990,7 @@ plot_category_with_docs_biber <- function(aggregated_data, individual_data, cate
       )
 
     if (interactive) {
-      p <- ggplotly(p, tooltip = c("y", "fill"))
+      p <- ggplotly(p, tooltip = c("y", "fill", "text"))
     }
     return(p)
   }
