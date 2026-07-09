@@ -157,9 +157,10 @@ dataInputServer <- function(id) {
         combined_values <- df[[input$meta_column]]
       }
 
+
       # Sort and get counts
       value_counts <- table(combined_values)
-      value_counts <- sort(value_counts, decreasing = TRUE)
+      value_counts <- value_counts[order(names(value_counts))]
 
       # Create choices with counts — guard against no values to filter on
       if (length(value_counts) == 0) {
