@@ -102,6 +102,17 @@ server <- function(input, output, session) {
   # Call KWIC module
   kwicServer("kwic", processing_module = processing_module)
 
+  # Call tag guide
+  tag_guide <- tagGuideServer("tag_guide", biber_base)   # <- add here
+
+  observeEvent(tag_guide$clicked_tag(), {                # <- and this right after
+    req(tag_guide$clicked_tag())
+    updateRadioButtons(session, "kwic-search_mode", selected = "tag")
+    updateTextInput(session, "kwic-bundle_query",
+                    value = paste0("{{", tag_guide$clicked_tag(), "}}"))
+  })
+
+
   # Call export module
   exportServer("export", processing_module)
 

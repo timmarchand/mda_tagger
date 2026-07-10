@@ -265,30 +265,35 @@ resultsUI <- function(id) {
         status = "info",
         collapsible = TRUE,
         collapsed = TRUE,
-
         tags$dl(
           tags$dt("Dimension 1: Involved vs. Informational Production"),
           tags$dd("Positive: Interactive, personal, involved (e.g., conversation)"),
           tags$dd("Negative: Informational, detached, formal (e.g., academic writing)"),
-
           tags$dt("Dimension 2: Narrative vs. Non-narrative Concerns"),
           tags$dd("Positive: Narrative focus, past tense, third person"),
           tags$dd("Negative: Non-narrative, present tense, descriptive"),
-
           tags$dt("Dimension 3: Explicit vs. Situation-Dependent Reference"),
           tags$dd("Positive: Explicit elaboration, precise reference"),
           tags$dd("Negative: Situation-dependent, immediate context assumed"),
-
           tags$dt("Dimension 4: Overt Expression of Persuasion"),
           tags$dd("Positive: Persuasive, argumentative stance"),
           tags$dd("Negative: Neutral, objective presentation"),
-
           tags$dt("Dimension 5: Abstract vs. Non-abstract Information"),
           tags$dd("Positive: Abstract, technical, formal style"),
           tags$dd("Negative: Concrete, non-technical information")
         )
       )
+    ),
+    # Tag guide (below Dimension Interpretations)
+    fluidRow(
+      box(
+        title = "🏷️ Tag Guide",
+        width = 12,
+        status = "info",
+        collapsible = TRUE,
+        collapsed = TRUE,
+        tagGuideUI("tag_guide")
+      )
     )
-
   )  # End tagList
 }    # End function

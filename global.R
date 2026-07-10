@@ -103,4 +103,7 @@ source("modules/ui_kwic.R")
 source("modules/server_kwic.R")
 cat("   ✓ KWIC module loaded\n")
 
+source("modules/tag_guide.R")
+cat("   ✓ Tag guide module loaded\n")
+
 
