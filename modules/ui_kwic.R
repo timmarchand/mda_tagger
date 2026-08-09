@@ -21,17 +21,16 @@ kwicUI <- function(id) {
         status = "primary",
         solidHeader = TRUE,
 
-        # Data source
         radioButtons(
           ns("data_source"),
           "Data source:",
           choices = c(
             "In-memory (processed data)" = "memory",
-            "Upload vertical .txt files"  = "upload"
+            "Upload vertical .txt files"  = "upload",
+            "Upload tagged CSV"           = "csv"
           ),
           selected = "memory"
         ),
-
         conditionalPanel(
           condition = paste0("input['", ns("data_source"), "'] == 'upload'"),
           fileInput(
@@ -40,6 +39,17 @@ kwicUI <- function(id) {
             multiple = TRUE,
             accept   = ".txt"
           )
+        ),
+        conditionalPanel(
+          condition = paste0("input['", ns("data_source"), "'] == 'csv'"),
+          fileInput(
+            ns("tagged_csv"),
+            "Upload tagged CSV:",
+            multiple = FALSE,
+            accept   = ".csv"
+          ),
+          p(class = "text-muted", style = "font-size: 11px;",
+            "CSV must have doc_id and tagged_text columns; metadata column optional.")
         ),
 
         hr(),
@@ -95,13 +105,16 @@ kwicUI <- function(id) {
           step  = 1
         ),
 
-        numericInput(
-          ns("lines"),
-          "Max lines to display:",
-          value = 20,
-          min   = 5,
-          max   = 200,
-          step  = 5
+        conditionalPanel(
+          condition = paste0("input['", ns("mode"), "'] != 'summary'"),
+          numericInput(
+            ns("lines"),
+            "Max lines to display:",
+            value = 20,
+            min   = 5,
+            max   = 200,
+            step  = 5
+          )
         ),
 
         radioButtons(
@@ -109,7 +122,8 @@ kwicUI <- function(id) {
           "Line selection:",
           choices = c(
             "Top frequent types first" = "top",
-            "Random sample"            = "random"
+            "Random sample"            = "random",
+            "Summary (one per type)"   = "summary"
           ),
           selected = "top",
           inline   = TRUE
@@ -137,17 +151,15 @@ kwicUI <- function(id) {
       ),
 
       # Results panel
+      # Results panel
       box(
         title = "📋 Results",
         width = 8,
         status = "info",
         solidHeader = TRUE,
-
         # Summary line
         uiOutput(ns("results_summary")),
-
         br(),
-
         # Download button — only shown when results exist
         conditionalPanel(
           condition = paste0("output['", ns("has_results"), "']"),
@@ -158,9 +170,15 @@ kwicUI <- function(id) {
           ),
           br(), br()
         ),
-
         # Results table
-        DT::dataTableOutput(ns("kwic_table"))
+        DT::dataTableOutput(ns("kwic_table")),
+        # TTR by category — shown only when metadata is present
+        conditionalPanel(
+          condition = paste0("output['", ns("has_meta"), "']"),
+          hr(),
+          h5("📊 TTR by Category"),
+          DT::dataTableOutput(ns("meta_ttr_table"))
+        )
       )
     )
   )
