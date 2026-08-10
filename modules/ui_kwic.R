@@ -107,13 +107,12 @@ kwicUI <- function(id) {
 
         conditionalPanel(
           condition = paste0("input['", ns("mode"), "'] != 'summary'"),
-          numericInput(
+          selectInput(
             ns("lines"),
             "Max lines to display:",
-            value = 20,
-            min   = 5,
-            max   = 200,
-            step  = 5
+            choices  = c("5" = "5", "10" = "10", "20" = "20", "50" = "50",
+                         "100" = "100", "200" = "200", "All" = "all"),
+            selected = "20"
           )
         ),
 
@@ -177,6 +176,12 @@ kwicUI <- function(id) {
           condition = paste0("output['", ns("has_meta"), "']"),
           hr(),
           h5("📊 TTR by Category"),
+          downloadButton(
+            ns("download_meta_ttr"),
+            "Download TTR/Entropy (CSV)",
+            class = "btn-success btn-sm"
+          ),
+          br(), br(),
           DT::dataTableOutput(ns("meta_ttr_table"))
         )
       )

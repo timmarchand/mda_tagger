@@ -292,10 +292,17 @@ kwicServer <- function(id, processing_module) {
     })
     kwic_results <- reactive({
       req(kwic_raw_results())
+      lines_val <- if (input$mode == "summary") {
+        200
+      } else if (input$lines == "all") {
+        nrow(kwic_raw_results())
+      } else {
+        as.numeric(input$lines)
+      }
       postprocess_kwic(
         results  = kwic_raw_results(),
         mode     = input$mode,
-        lines    = if (input$mode != "summary") input$lines else 200,
+        lines    = lines_val,
         top_n    = if (!is.null(input$top_n)) input$top_n else 5,
         is_token = input$search_mode == "token"
       )
@@ -424,6 +431,18 @@ kwicServer <- function(id, processing_module) {
       },
       contentType = "text/csv"
     )
-
+    # ---- TTR/Entropy CSV download ----
+    output$download_meta_ttr <- downloadHandler(
+      filename = function() {
+        query <- if (input$search_mode == "token") input$token_query else input$bundle_query
+        query <- str_replace_all(trimws(query), "[^A-Za-z0-9_-]", "_")
+        paste0("kwic_ttr_entropy_", query, "_", format(Sys.Date(), "%Y%m%d"), ".csv")
+      },
+      content = function(file) {
+        req(meta_ttr_table())
+        readr::write_csv(meta_ttr_table(), file)
+      },
+      contentType = "text/csv"
+    )
   })
 }
