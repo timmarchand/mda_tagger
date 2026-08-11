@@ -63,7 +63,22 @@ exportUI <- function(id) {
         br(), br(),
 
         p(class = "text-muted",
-          "ZIP file will contain one .txt file per document with tagged text.")
+          "ZIP file will contain one .txt file per document with tagged text."),
+
+        hr(),
+
+        downloadButton(
+          ns("download_pretagged_csv"),
+          "Download as Pre-tagged CSV",
+          class = "btn-outline-primary btn-block"
+        ),
+
+        br(), br(),
+
+        p(class = "text-muted",
+          "CSV with doc_id, tagged_text, metadata columns \u2014 matches the format
+           expected by the Pre-tagged Data upload option, so you can re-import
+           this file directly.")
       ),
 
       box(

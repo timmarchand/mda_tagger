@@ -53,6 +53,31 @@ exportServer <- function(id, processing_module) {
       },
       contentType = "application/zip"
     )
+    # ---- Download Pre-tagged CSV (matches import template) ----
+    output$download_pretagged_csv <- downloadHandler(
+      filename = function() {
+        paste0("pretagged_data_", format(Sys.Date(), "%Y%m%d"), ".csv")
+      },
+      content = function(file) {
+        req(results_data())
+        validate(
+          need("tagged_text" %in% names(results_data()),
+               "Tagged text not available. Please reprocess your data.")
+        )
+
+        data <- results_data()
+        has_meta <- "metadata" %in% names(data)
+
+        export_df <- tibble(
+          doc_id      = data$doc_id,
+          tagged_text = data$tagged_text,
+          metadata    = if (has_meta) data$metadata else "unknown"
+        )
+
+        readr::write_csv(export_df, file)
+      },
+      contentType = "text/csv"
+    )
 
     # ---- Download Tables (Excel) ----
     output$download_tables <- downloadHandler(
