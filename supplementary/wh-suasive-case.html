@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wh-Suasive Case Study — Supplementary Materials</title>
+
+<style>
+  :root {
+    --text: #1a1a1a; --muted: #595959; --border: #d8d8d8;
+    --bg-code: #f6f6f6; --accent: #1a5276; --bg-head: #eaeaea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--text); max-width: 860px; margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem; line-height: 1.6; font-size: 17px;
+  }
+  h1 { font-size: 1.7rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; color: var(--accent); margin-top: 2.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.6rem; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: 'SF Mono', Consolas, Menlo, monospace; font-size: 0.88em;
+    background: var(--bg-code); padding: 0.15em 0.4em; border-radius: 3px;
+  }
+  pre {
+    background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1rem 1.2rem; overflow-x: auto; font-size: 0.86em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.92em; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg-head); font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+           color: var(--muted); font-size: 0.88rem; font-style: italic; }
+  nav.crumbs { font-size: 0.88rem; margin-bottom: 1.5rem; }
+  nav.crumbs a { text-decoration: none; }
+  strong { color: #111; }
+</style>
+
+</head>
+<body>
+<nav class="crumbs"><a href="index.html">&larr; Supplementary Materials index</a></nav>
+<h1>A Case Study in Separation: The Wh-Suasive Frame</h1>
+<h2>Purpose</h2>
+<p>This file documents a supplementary analysis of the wh-suasive frame <code>{{WRB}} {{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}}</code>, one of two bundles excluded from the confirmatory regression analysis in the main text under the corrected DP criterion (Section 3.5; DP = 0.77, exceeding the DP ≤ 0.75 threshold). This bundle is examined here as a stress test of estimator behaviour under sparsity more extreme than any of the six modelled bundles exhibit (present in only 3.7% of files, versus 16.7%–69.5% for the modelled set). The result is a distinct and instructive failure mode — separation — that is conceptually different from the GLMM singular-fit issue discussed in Section 5.1 of the main text. Both frequentist estimators handle it identically, by correctly signalling the problem rather than either producing a misleadingly confident estimate; a supplementary Bayesian comparison, following Winter and Bürkner's (2021) recommended approach, shows that weakly informative priors can resolve this failure directly, recovering a genuinely interpretable developmental pattern that frequentist estimation could not access.</p>
+<h2>The data</h2>
+<pre><code class="language-r">complete_regression_df |&gt;
+  filter(tag_bundle == &quot;{{WRB}} {{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}}&quot;) |&gt;
+  summarise(total_count = sum(raw_count), n_files = n(), .by = c(level, topic)) |&gt;
+  arrange(level, topic)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Topic</th>
+<th>Total count</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NS</td>
+<td>PTJ</td>
+<td><strong>0</strong></td>
+<td>200</td>
+</tr>
+<tr>
+<td>NS</td>
+<td>SMK</td>
+<td><strong>0</strong></td>
+<td>200</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>PTJ</td>
+<td>12</td>
+<td>154</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>SMK</td>
+<td>7</td>
+<td>154</td>
+</tr>
+<tr>
+<td>B1</td>
+<td>PTJ</td>
+<td>16</td>
+<td>228</td>
+</tr>
+<tr>
+<td>B1</td>
+<td>SMK</td>
+<td>10</td>
+<td>228</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>PTJ</td>
+<td>1</td>
+<td>18</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>SMK</td>
+<td><strong>0</strong></td>
+<td>18</td>
+</tr>
+</tbody>
+</table>
+<p>Total: 46 occurrences across the learner sub-corpus (A2 + B1 + B2 combined); <strong>zero occurrences across all 400 NS files</strong>.</p>
+<h2>Lexical realisation</h2>
+<p>Concordance inspection (JPN only, since NS shows no occurrences at all) reveals that even within the learner sub-corpus, this bundle is close to a single fixed formula: only two distinct lexical types occur across the full 46 tokens.</p>
+<table>
+<thead>
+<tr>
+<th>Realisation</th>
+<th>Freq</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>why I agree</em></td>
+<td>44</td>
+<td>...their money. That is <strong>why I agree</strong> with the statement. (W_JPN_PTJ_B1_1_025)</td>
+</tr>
+<tr>
+<td><em>why I insist</em></td>
+<td>2</td>
+<td>...will not. This is <strong>why I insist</strong> that smoking should not be... (W_JPN_SMK_B1_1_043)</td>
+</tr>
+</tbody>
+</table>
+<p>Types = 2, Tokens = 46, TTR = 0.043 — a similarly extreme formulaic concentration to M4 (<code>I agree with</code>, TTR = 0.011 JPN), though with a slightly less total lock. This reinforces the categorical-divergence reading below: not only is the bundle entirely absent from NS writing, but its learner-side usage is itself dominated by a single formula rather than reflecting productive deployment of the underlying wh-suasive structure.</p>
+<h2>The mechanism: separation, not model complexity</h2>
+<p>The regression specification used throughout the main text treats NS as the reference level, meaning every level coefficient (A2, B1, B2) estimates a rate <em>relative to</em> the NS rate. Here, the NS rate is a true structural zero. A log-linear rate model cannot express "infinitely more common than zero" as a finite number: the optimiser instead drives the relevant coefficients toward extreme values in an attempt to approximate this, a textbook instance of quasi-complete separation.</p>
+<h3>Full interaction model (as specified in Section 3.3 of the main text)</h3>
+<p><strong>PPML:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Estimate</th>
+<th>SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>-25.8</td>
+<td>0.0000004</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>17.7</td>
+<td>0.279</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>17.6</td>
+<td>0.257</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>17.3</td>
+<td>0.982</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>0.007</td>
+<td>0.0000004</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>-0.509</td>
+<td>0.471</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>-0.446</td>
+<td>0.382</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>-17.4</td>
+<td>0.982</td>
+</tr>
+</tbody>
+</table>
+<p><strong>GLMM Poisson:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Estimate</th>
+<th>SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>-28.0</td>
+<td>158</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>18.6</td>
+<td>158</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>18.5</td>
+<td>158</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>18.3</td>
+<td>158</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.215</td>
+<td>194</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>-0.285</td>
+<td>194</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>-0.224</td>
+<td>194</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>-18.9</td>
+<td>363</td>
+</tr>
+</tbody>
+</table>
+<p>Both estimators return coefficients in the 17–18 range on the log scale — exp(17.7) ≈ 4.9 × 10⁷, a physically meaningless rate ratio. Note also that levelB2 (+17.3, PPML) and levelB2:topicSMK (−17.4, PPML) very nearly cancel: this reflects the B2×SMK cell <em>also</em> being a true zero (1 occurrence in B2×PTJ, 0 in B2×SMK), so the model is simultaneously attempting to explode and cancel two separate zero-cells at once.</p>
+<p>The two estimators fail in different but equally diagnostic ways. PPML's failure is quiet: the intercept and topicSMK terms carry deceptively tiny standard errors (~4 × 10⁻⁷), which could be mistaken for precision if one only checks the SE column and not the coefficient magnitude. GLMM's failure is loud: standard errors in the hundreds make the absence of real information immediately visible.</p>
+<h3>Simplified main-effects model</h3>
+<p>To rule out model complexity (an 8-cell saturated interaction model fitted to only 46 occurrences) as the driver, the same bundle was refitted without the interaction term:</p>
+<pre><code class="language-r">feglm(raw_count ~ level + topic, offset = ~log(file_wc),
+      cluster = &quot;writer_id&quot;, family = &quot;quasipoisson&quot;, data = model_sub, notes = FALSE)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Estimate</th>
+<th>SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>-25.6</td>
+<td>0.111</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>17.5</td>
+<td>0.252</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>17.4</td>
+<td>0.207</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>16.6</td>
+<td>0.979</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.501</td>
+<td>0.295</td>
+</tr>
+</tbody>
+</table>
+<p>The explosion persists (coefficients still in the 16–18 range) even after removing every interaction term. This confirms the mechanism is the structural zero in the reference cell itself, not the complexity of the interaction specification: no amount of simplification can produce a finite, meaningful estimate of "rate relative to a baseline of zero" under frequentist maximum likelihood.</p>
+<h2>Bayesian comparison (brms)</h2>
+<p>Winter and Bürkner (2021) specifically advocate Bayesian estimation for exactly this kind of sparse-data difficulty, arguing that weakly informative priors supply regularisation that the frequentist maximum likelihood lacks. This was tested directly on the wh-suasive frame's full interaction specification, using their own recommended prior convention on fixed effects:</p>
+<pre><code class="language-r">library(brms)
+
+weak_priors &lt;- c(
+  prior(normal(0, 0.5), class = &quot;b&quot;),
+  prior(normal(0, 2),   class = &quot;Intercept&quot;),
+  prior(exponential(1), class = &quot;sd&quot;)
+)
+
+bayes_mdl &lt;- brm(
+  raw_count ~ level * topic + offset(log(file_wc)) + (1 | writer_id),
+  data = model_sub, family = poisson(), prior = weak_priors,
+  chains = 4, iter = 4000, warmup = 1000,
+  control = list(adapt_delta = 0.99, max_treedepth = 15), seed = 42
+)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Estimate</th>
+<th>95% CI</th>
+<th>Credible?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>-9.46</td>
+<td>[-10.18, -8.85]</td>
+<td>—</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>0.87</td>
+<td>[0.22, 1.50]</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>0.86</td>
+<td>[0.24, 1.48]</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>0.04</td>
+<td>[-0.86, 0.93]</td>
+<td>No</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.46</td>
+<td>[-1.07, 0.14]</td>
+<td>No</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>0.14</td>
+<td>[-0.62, 0.88]</td>
+<td>No</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>0.15</td>
+<td>[-0.55, 0.85]</td>
+<td>No</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>-0.07</td>
+<td>[-1.03, 0.86]</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p>Convergence is clean throughout: Rhat = 1.00 for every parameter, Bulk/Tail ESS in the thousands to tens of thousands, and <strong>zero divergent transitions</strong> across 12,000 post-warmup draws (4 chains × 4,000 iterations, 1,000 warmup). Every coefficient is finite and every credible interval is a usable interval — a striking contrast with the ±17–18-order explosion both frequentist estimators produced on the identical specification above.</p>
+<p>The result is interesting in its own right. Exponentiating the two credible coefficients: A2 learners show a rate of this bundle approximately 2.39 times the (near-zero) NS baseline [exp(0.87)], and B1 learners approximately 2.36 times [exp(0.86)], both with 95% credible intervals excluding zero. By B2, the coefficient (0.04) is no longer credibly different from the NS baseline. This pattern — elevated use at A2 and B1 that is no longer statistically credible by B2 — parallels the "no longer detectable by B2" trajectory identified for M5 in the confirmatory analysis (Section 4.2.4 of the main text), though this single-bundle exploratory result has not been subjected to the same holdout robustness check applied to the six modelled bundles and should be read as suggestive rather than confirmatory.</p>
+<h2>Interpretation</h2>
+<p>This is a different problem from the GLMM singular-fit issue documented in Section 5.1 of the main text. That issue was an artefact of an incompletely specified panel — a data-construction problem, fixed by ensuring every file receives an explicit zero-count row. Separation is not fixable by any panel correction: it is a property of the true data-generating process itself, arising whenever an entire reference category has zero occurrences of the outcome. No frequentist estimator in the Poisson-GLM family — PPML, GLMM Poisson, or GLMM Negative Binomial — can produce a meaningful finite rate ratio against a zero baseline without additional regularisation; the Bayesian comparison above shows that weakly informative priors supply exactly this regularisation, recovering an interpretable result from the same underlying data. It remains a point in favour of both frequentist estimators that they fail <em>identically and diagnostically</em> here, rather than either silently returning a plausible-looking but spurious estimate.</p>
+<p>The substantive finding this diagnostic surfaces is arguably more interesting than a regression coefficient would have been: <strong>native-speaker writers in this corpus never produce the wh-suasive frame at all</strong> (0 of 400 files), while learners produce it, rarely, at every proficiency level studied (46 total occurrences). The Bayesian model refines this picture further: learner-side use is credibly elevated above the NS baseline at A2 and B1, but is no longer credibly distinguishable from it by B2. This is a genuine developmental signal invisible to both frequentist estimators, and a categorical divergence — complete presence versus complete absence at the population level — qualitatively different from the rate-based underuse and overuse reported for the six modelled bundles in the main text. This is consistent with this bundle's independent exclusion from the confirmatory analysis under the corrected DP criterion (Section 3.5): a construction concentrated in a small, specific subset of the population (here, entirely absent from one population) is by definition not amenable to the same kind of rate-comparison modelling as a bundle in general use by both groups. The lexical realisation data above sharpens this picture further: even the bundle's rare learner-side usage is not a productively deployed structural pattern but is itself dominated by a single fixed formula (<em>why I agree</em>, 44 of 46 tokens), suggesting the wh-suasive frame functions, where it survives at all, as a memorised essay-opening variant rather than a genuinely available grammatical resource.</p>
+<footer>This file accompanies Marchand, T. (2026). "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML." APCLC 2026 Proceedings.</footer>
+</body>
+</html>

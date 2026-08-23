@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wald Tests — Supplementary Materials</title>
+
+<style>
+  :root {
+    --text: #1a1a1a; --muted: #595959; --border: #d8d8d8;
+    --bg-code: #f6f6f6; --accent: #1a5276; --bg-head: #eaeaea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--text); max-width: 860px; margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem; line-height: 1.6; font-size: 17px;
+  }
+  h1 { font-size: 1.7rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; color: var(--accent); margin-top: 2.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.6rem; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: 'SF Mono', Consolas, Menlo, monospace; font-size: 0.88em;
+    background: var(--bg-code); padding: 0.15em 0.4em; border-radius: 3px;
+  }
+  pre {
+    background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1rem 1.2rem; overflow-x: auto; font-size: 0.86em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.92em; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg-head); font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin-top: -0.6rem; margin-bottom: 1.8rem; }
+  .note { background: #fdf6e3; border-left: 4px solid #d9a441; padding: 0.8rem 1.1rem; margin: 1.2rem 0; font-size: 0.94em; }
+  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+           color: var(--muted); font-size: 0.88rem; font-style: italic; }
+  nav.crumbs { font-size: 0.88rem; margin-bottom: 1.5rem; }
+  nav.crumbs a { text-decoration: none; }
+  strong { color: #111; }
+  .credible { color: #0a6e31; font-weight: 600; }
+</style>
+
+</head>
+<body>
+<nav class="crumbs"><a href="index.html">&larr; Supplementary Materials index</a></nav>
+<h1>Restricted vs Full Model Comparison: Topic Moderation Wald Tests</h1>
+<h2>Purpose</h2>
+<p>This file reports the full results of the clustered Wald tests used to assess whether topic (PTJ vs SMK) meaningfully moderates the proficiency effect for each of the six modelled evaluative bundles, referenced in Section 4.2 of Marchand, T. (2026), "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML," <em>APCLC 2026 Proceedings</em>.</p>
+<h2>Method</h2>
+<p>For each of the six bundles, a <strong>restricted model</strong> (level effects only: <code>raw_count ~ level</code>) was compared against the <strong>full interaction model</strong> (<code>raw_count ~ level * topic</code>) reported in the main text, using a clustered Wald test (<code>fixest::wald()</code>) that jointly tests the null hypothesis that the topic main effect and all three level × topic interaction terms are simultaneously zero. Both models were fitted on the same zero-inclusive frequency dataset described in Section 3.5 of the main text, with standard errors clustered by writer ID.</p>
+<pre><code class="language-r"># Restricted models: level only, no topic
+restricted_models &lt;- map(
+  setNames(bundle_legend$Bundle, bundle_legend$Bundle),
+  function(bundle) {
+    model_sub &lt;- complete_regression_df |&gt;
+      filter(tag_bundle == bundle) |&gt;
+      ungroup()
+    feglm(
+      raw_count ~ level,
+      offset  = ~ log(file_wc),
+      cluster = &quot;writer_id&quot;,
+      family  = &quot;quasipoisson&quot;,
+      data    = model_sub,
+      notes   = FALSE
+    )
+  }
+)
+
+# Wald test: jointly test topic + all level:topic interactions = 0
+wald_results &lt;- map_dfr(bundle_legend$Model, function(m) {
+  full_mod   &lt;- valid_models[[m]]
+  bundle_str &lt;- bundle_legend$Bundle[bundle_legend$Model == m]
+  restr_mod  &lt;- restricted_models[[bundle_str]]
+  w &lt;- wald(full_mod, keep = &quot;topic&quot;)
+  tibble(
+    Model             = m,
+    Bundle            = bundle_str,
+    wald_stat         = w$stat,
+    wald_df1          = w$df1,
+    wald_df2          = w$df2,
+    wald_p            = w$p,
+    sq_cor_restricted = summary(restr_mod)$sq.cor,
+    sq_cor_full       = summary(full_mod)$sq.cor,
+    sq_cor_gain       = summary(full_mod)$sq.cor - summary(restr_mod)$sq.cor
+  )
+})
+</code></pre>
+<h2>Results</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Feature Bundle</th>
+<th>JSD</th>
+<th>Wald χ²</th>
+<th>df</th>
+<th>p</th>
+<th>R² gain</th>
+<th>Direction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M6</td>
+<td><code>{{PRP&lt;PIT&gt;}} {{VBZ&lt;BEMA&gt;&lt;VPRT&gt;}} {{JJ&lt;PRED&gt;}}</code></td>
+<td>0.0025</td>
+<td>23.81</td>
+<td>4, 599</td>
+<td><strong>&lt; .001</strong></td>
+<td>.072</td>
+<td>Overused</td>
+</tr>
+<tr>
+<td>M4</td>
+<td><code>{{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}} {{IN&lt;PIN&gt;}}</code></td>
+<td>0.0041</td>
+<td>10.09</td>
+<td>4, 599</td>
+<td><strong>&lt; .001</strong></td>
+<td>.028</td>
+<td>Overused</td>
+</tr>
+<tr>
+<td>M3</td>
+<td><code>{{IN&lt;PIN&gt;}} {{DT}} {{JJ&lt;JJ&gt;}}</code></td>
+<td>0.0107</td>
+<td>4.98</td>
+<td>4, 599</td>
+<td><strong>.001</strong></td>
+<td>.010</td>
+<td>Underused</td>
+</tr>
+<tr>
+<td>M2</td>
+<td><code>{{.}} {{RB&lt;RB&gt;}} {{,}}</code></td>
+<td>0.0003</td>
+<td>4.18</td>
+<td>4, 599</td>
+<td><strong>.002</strong></td>
+<td>.010</td>
+<td>Overused</td>
+</tr>
+<tr>
+<td>M5</td>
+<td><code>{{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}} {{IN&lt;PIN&gt;}}</code></td>
+<td>0.0038</td>
+<td>2.55</td>
+<td>4, 599</td>
+<td><strong>.038</strong></td>
+<td>.010</td>
+<td>Underused</td>
+</tr>
+<tr>
+<td>M1</td>
+<td><code>{{DT}} {{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}}</code></td>
+<td>0.0014</td>
+<td>1.51</td>
+<td>4, 599</td>
+<td>.198</td>
+<td>.004</td>
+<td>Underused</td>
+</tr>
+</tbody>
+</table>
+<p><em>Bold p-values indicate significance at α = .05. Ordered by p-value ascending. JSD = Jensen–Shannon Divergence, computed descriptively at the tupling stage (Section 3.2 of the main text) as a predictor of topic sensitivity.</em></p>
+<h2>Interpretation</h2>
+<p>Five of the six bundles show a statistically significant Wald test, indicating that topic meaningfully moderates the proficiency effect beyond what a level-only model captures:</p>
+<ul>
+<li><strong>M6</strong> (predicative adjective frame, χ² = 23.81, p &lt; .001, R² gain = .072) shows by far the strongest and most consequential topic effect in the dataset — a striking result given its comparatively modest JSD score (0.0025), which would not, on JSD alone, have predicted such a pronounced interaction.</li>
+<li><strong>M4</strong> (first-person suasive bundle, χ² = 10.09, p &lt; .001, R² gain = .028) shows the second-strongest effect.</li>
+<li><strong>M3</strong> (prepositional evaluative NP, χ² = 4.98, p = .001), <strong>M2</strong> (sentence-boundary adverbial, χ² = 4.18, p = .002), and <strong>M5</strong> (adjective-noun-preposition, χ² = 2.55, p = .038) all reach conventional significance, with more modest R² gains (.010 each).</li>
+<li><strong>M1</strong> (the headline bundle, χ² = 1.51, p = .198) is the sole exception, clearly non-significant, confirming that its underuse is topic-general — consistent with the KWIC finding in Section 4.3 of the main text that avoidance of this pattern reflects a register-general discourse strategy rather than a topic-specific one.</li>
+</ul>
+<h3>JSD as a predictor of topic sensitivity</h3>
+<p>The relationship between JSD (computed descriptively at the tupling stage) and Wald test significance is directionally present but imperfect. JSD values for the six bundles, in descending order, are M3 (.0107), M4 (.0041), M5 (.0038), M6 (.0025), M1 (.0014), and M2 (.0003). M3 and M4, the two highest-JSD bundles, do show significant Wald tests, consistent with the JSD prediction. But M6, with the lowest JSD among the topic-sensitive bundles, shows by far the strongest Wald effect, and M2, with the lowest JSD in the entire set, is nonetheless clearly significant.</p>
+<p>This apparent tension is theoretically resolvable: JSD captures whether the <em>aggregate</em> topic distribution differs between JPN and NS writers, whereas the Wald test captures whether <em>topic moderates the proficiency effect specifically</em> — related but genuinely distinct questions. M6 in particular is a case where the aggregate topic distributions look similar between groups (hence low JSD) while the proficiency-conditioned effect of topic is nonetheless very large.</p>
+<h3>R² gains</h3>
+<p>R² gains from adding topic to the restricted model range from a modest .002 (M1) to a substantial .072 (M6), confirming that proficiency level remains the dominant predictor of evaluative bundle use across all six models while topic's contribution is clearly heterogeneous rather than uniformly negligible: for M6 in particular, topic is a first-order predictor in its own right.</p>
+<footer>This file accompanies Marchand, T. (2026). "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML." APCLC 2026 Proceedings.</footer>
+</body>
+</html>

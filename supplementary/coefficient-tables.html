@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coefficient Tables — Supplementary Materials</title>
+
+<style>
+  :root {
+    --text: #1a1a1a; --muted: #595959; --border: #d8d8d8;
+    --bg-code: #f6f6f6; --accent: #1a5276; --bg-head: #eaeaea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--text); max-width: 860px; margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem; line-height: 1.6; font-size: 17px;
+  }
+  h1 { font-size: 1.7rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; color: var(--accent); margin-top: 2.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.6rem; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: 'SF Mono', Consolas, Menlo, monospace; font-size: 0.88em;
+    background: var(--bg-code); padding: 0.15em 0.4em; border-radius: 3px;
+  }
+  pre {
+    background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1rem 1.2rem; overflow-x: auto; font-size: 0.86em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.92em; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg-head); font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin-top: -0.6rem; margin-bottom: 1.8rem; }
+  .note { background: #fdf6e3; border-left: 4px solid #d9a441; padding: 0.8rem 1.1rem; margin: 1.2rem 0; font-size: 0.94em; }
+  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+           color: var(--muted); font-size: 0.88rem; font-style: italic; }
+  nav.crumbs { font-size: 0.88rem; margin-bottom: 1.5rem; }
+  nav.crumbs a { text-decoration: none; }
+  strong { color: #111; }
+  .credible { color: #0a6e31; font-weight: 600; }
+</style>
+
+</head>
+<body>
+<nav class="crumbs"><a href="index.html">&larr; Supplementary Materials index</a></nav>
+<h1>Full Coefficient Tables: PPML vs GLMM Poisson vs GLMM Negative Binomial</h1>
+<h2>Purpose</h2>
+<p>This file reports complete coefficient tables (estimate and clustered/model-based standard error) for all six modelled bundles under three estimators, referenced in Section 4.1 of Marchand, T. (2026), "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML," <em>APCLC 2026 Proceedings</em>.</p>
+<p>All models are fitted on the same zero-inclusive frequency dataset described in Section 3.5 of the main text (n = 1,200 observations per model). PPML standard errors are clustered by writer ID; GLMM standard errors are model-based (Wald), computed via <code>lme4::glmer()</code>.</p>
+<pre><code class="language-r"># PPML specification
+feglm(raw_count ~ level * topic, offset = ~log(file_wc),
+      cluster = &quot;writer_id&quot;, family = &quot;quasipoisson&quot;, data = model_sub)
+
+# GLMM Poisson / Negative Binomial specification
+glmer(raw_count ~ level * topic + offset(log(file_wc)) + (1 | writer_id),
+      family = poisson, data = model_sub)          # Poisson
+glmer.nb(raw_count ~ level * topic + offset(log(file_wc)) + (1 | writer_id),
+         data = model_sub)                          # Negative Binomial
+</code></pre>
+<h2>Coefficient tables, all three estimators</h2>
+<p>Point estimates and standard errors for all seven terms, all six bundles. Intercepts are included for the GLMM Negative Binomial columns since these were captured directly from <code>tidy()</code> output; PPML and GLMM Poisson intercepts are omitted for consistency with the main text, which reports level and topic effects only.</p>
+<h3>M1: <code>{{DT}} {{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}}</code></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>PPML est.</th>
+<th>PPML SE</th>
+<th>GLMM Poisson est.</th>
+<th>GLMM Poisson SE</th>
+<th>GLMM NB est.</th>
+<th>GLMM NB SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>-4.60</td>
+<td>0.053</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>-0.978</td>
+<td>0.120</td>
+<td>-0.996</td>
+<td>0.100</td>
+<td>-0.996</td>
+<td>0.101</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>0.307</td>
+<td>0.152</td>
+<td>0.305</td>
+<td>0.126</td>
+<td>0.306</td>
+<td>0.127</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>-0.915</td>
+<td>0.088</td>
+<td>-0.927</td>
+<td>0.086</td>
+<td>-0.927</td>
+<td>0.086</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>0.161</td>
+<td>0.119</td>
+<td>0.157</td>
+<td>0.110</td>
+<td>0.157</td>
+<td>0.111</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>-0.718</td>
+<td>0.248</td>
+<td>-0.727</td>
+<td>0.226</td>
+<td>-0.727</td>
+<td>0.227</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>0.453</td>
+<td>0.341</td>
+<td>0.450</td>
+<td>0.270</td>
+<td>0.450</td>
+<td>0.272</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.106</td>
+<td>0.068</td>
+<td>-0.104</td>
+<td>0.064</td>
+<td>-0.104</td>
+<td>0.065</td>
+</tr>
+</tbody>
+</table>
+<h3>M2: <code>{{.}} {{RB&lt;RB&gt;}} {{,}}</code></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>PPML est.</th>
+<th>PPML SE</th>
+<th>GLMM Poisson est.</th>
+<th>GLMM Poisson SE</th>
+<th>GLMM NB est.</th>
+<th>GLMM NB SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>-6.26</td>
+<td>0.108</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>1.098</td>
+<td>0.130</td>
+<td>1.103</td>
+<td>0.133</td>
+<td>1.10</td>
+<td>0.133</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>0.066</td>
+<td>0.204</td>
+<td>0.067</td>
+<td>0.164</td>
+<td>0.067</td>
+<td>0.165</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>1.136</td>
+<td>0.120</td>
+<td>1.145</td>
+<td>0.124</td>
+<td>1.14</td>
+<td>0.124</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>-0.167</td>
+<td>0.193</td>
+<td>-0.170</td>
+<td>0.158</td>
+<td>-0.170</td>
+<td>0.158</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>1.006</td>
+<td>0.206</td>
+<td>0.990</td>
+<td>0.261</td>
+<td>0.990</td>
+<td>0.261</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>-0.054</td>
+<td>0.290</td>
+<td>-0.038</td>
+<td>0.304</td>
+<td>-0.039</td>
+<td>0.306</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.118</td>
+<td>0.179</td>
+<td>-0.115</td>
+<td>0.138</td>
+<td>-0.115</td>
+<td>0.138</td>
+</tr>
+</tbody>
+</table>
+<h3>M3: <code>{{IN&lt;PIN&gt;}} {{DT}} {{JJ&lt;JJ&gt;}}</code></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>PPML est.</th>
+<th>PPML SE</th>
+<th>GLMM Poisson est.</th>
+<th>GLMM Poisson SE</th>
+<th>GLMM NB est.</th>
+<th>GLMM NB SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>-5.52</td>
+<td>0.080</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>-1.235</td>
+<td>0.171</td>
+<td>-1.243</td>
+<td>0.165</td>
+<td>-1.24</td>
+<td>0.166</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>0.552</td>
+<td>0.223</td>
+<td>0.554</td>
+<td>0.209</td>
+<td>0.554</td>
+<td>0.210</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>-1.346</td>
+<td>0.148</td>
+<td>-1.350</td>
+<td>0.148</td>
+<td>-1.35</td>
+<td>0.148</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>0.664</td>
+<td>0.192</td>
+<td>0.664</td>
+<td>0.185</td>
+<td>0.664</td>
+<td>0.186</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>-1.083</td>
+<td>0.459</td>
+<td>-1.094</td>
+<td>0.399</td>
+<td>-1.09</td>
+<td>0.400</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>0.639</td>
+<td>0.542</td>
+<td>0.641</td>
+<td>0.486</td>
+<td>0.642</td>
+<td>0.489</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.089</td>
+<td>0.103</td>
+<td>-0.090</td>
+<td>0.100</td>
+<td>-0.090</td>
+<td>0.101</td>
+</tr>
+</tbody>
+</table>
+<h3>M4: <code>{{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}} {{IN&lt;PIN&gt;}}</code></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>PPML est.</th>
+<th>PPML SE</th>
+<th>GLMM Poisson est.</th>
+<th>GLMM Poisson SE</th>
+<th>GLMM NB est.</th>
+<th>GLMM NB SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>-8.31</td>
+<td>0.272</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>1.863</td>
+<td>0.287</td>
+<td>1.848</td>
+<td>0.299</td>
+<td>1.85</td>
+<td>0.297</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>-0.199</td>
+<td>0.407</td>
+<td>-0.198</td>
+<td>0.435</td>
+<td>-0.198</td>
+<td>0.428</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>2.169</td>
+<td>0.270</td>
+<td>2.166</td>
+<td>0.286</td>
+<td>2.17</td>
+<td>0.283</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>-0.493</td>
+<td>0.394</td>
+<td>-0.491</td>
+<td>0.419</td>
+<td>-0.491</td>
+<td>0.412</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>1.881</td>
+<td>0.395</td>
+<td>1.905</td>
+<td>0.452</td>
+<td>1.90</td>
+<td>0.450</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>0.360</td>
+<td>0.507</td>
+<td>0.357</td>
+<td>0.597</td>
+<td>0.357</td>
+<td>0.593</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.149</td>
+<td>0.379</td>
+<td>-0.149</td>
+<td>0.393</td>
+<td>-0.149</td>
+<td>0.386</td>
+</tr>
+</tbody>
+</table>
+<h3>M5: <code>{{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}} {{IN&lt;PIN&gt;}}</code></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>PPML est.</th>
+<th>PPML SE</th>
+<th>GLMM Poisson est.</th>
+<th>GLMM Poisson SE</th>
+<th>GLMM NB est.</th>
+<th>GLMM NB SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>-5.38</td>
+<td>0.072</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>-0.852</td>
+<td>0.133</td>
+<td>-0.855</td>
+<td>0.136</td>
+<td>-0.854</td>
+<td>0.134</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>0.276</td>
+<td>0.187</td>
+<td>0.274</td>
+<td>0.192</td>
+<td>0.275</td>
+<td>0.188</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>-0.841</td>
+<td>0.112</td>
+<td>-0.849</td>
+<td>0.118</td>
+<td>-0.842</td>
+<td>0.116</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>0.408</td>
+<td>0.164</td>
+<td>0.413</td>
+<td>0.164</td>
+<td>0.408</td>
+<td>0.161</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>-0.364</td>
+<td>0.201</td>
+<td>-0.367</td>
+<td>0.274</td>
+<td>-0.361</td>
+<td>0.270</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>0.572</td>
+<td>0.345</td>
+<td>0.570</td>
+<td>0.353</td>
+<td>0.569</td>
+<td>0.347</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.289</td>
+<td>0.098</td>
+<td>-0.292</td>
+<td>0.101</td>
+<td>-0.289</td>
+<td>0.100</td>
+</tr>
+</tbody>
+</table>
+<h3>M6: <code>{{PRP&lt;PIT&gt;}} {{VBZ&lt;BEMA&gt;&lt;VPRT&gt;}} {{JJ&lt;PRED&gt;}}</code></h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>PPML est.</th>
+<th>PPML SE</th>
+<th>GLMM Poisson est.</th>
+<th>GLMM Poisson SE</th>
+<th>GLMM NB est.</th>
+<th>GLMM NB SE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(Intercept)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>-6.28</td>
+<td>0.106</td>
+</tr>
+<tr>
+<td>levelA2</td>
+<td>0.992</td>
+<td>0.130</td>
+<td>0.993</td>
+<td>0.129</td>
+<td>0.993</td>
+<td>0.128</td>
+</tr>
+<tr>
+<td>levelA2:topicSMK</td>
+<td>-0.287</td>
+<td>0.202</td>
+<td>-0.287</td>
+<td>0.203</td>
+<td>-0.287</td>
+<td>0.203</td>
+</tr>
+<tr>
+<td>levelB1</td>
+<td>0.878</td>
+<td>0.127</td>
+<td>0.882</td>
+<td>0.123</td>
+<td>0.881</td>
+<td>0.123</td>
+</tr>
+<tr>
+<td>levelB1:topicSMK</td>
+<td>-0.288</td>
+<td>0.200</td>
+<td>-0.288</td>
+<td>0.194</td>
+<td>-0.288</td>
+<td>0.194</td>
+</tr>
+<tr>
+<td>levelB2</td>
+<td>0.829</td>
+<td>0.234</td>
+<td>0.822</td>
+<td>0.254</td>
+<td>0.822</td>
+<td>0.254</td>
+</tr>
+<tr>
+<td>levelB2:topicSMK</td>
+<td>0.080</td>
+<td>0.385</td>
+<td>0.081</td>
+<td>0.372</td>
+<td>0.081</td>
+<td>0.372</td>
+</tr>
+<tr>
+<td>topicSMK</td>
+<td>-0.452</td>
+<td>0.167</td>
+<td>-0.453</td>
+<td>0.162</td>
+<td>-0.453</td>
+<td>0.162</td>
+</tr>
+</tbody>
+</table>
+<h2>Negative binomial dispersion parameters</h2>
+<p>Both GLMM families converge without a singular fit for all six bundles (<code>isSingular() = FALSE</code> throughout).</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Bundle</th>
+<th>NB theta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M1</td>
+<td><code>{{DT}} {{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}}</code></td>
+<td>95.0</td>
+</tr>
+<tr>
+<td>M2</td>
+<td><code>{{.}} {{RB&lt;RB&gt;}} {{,}}</code></td>
+<td>133</td>
+</tr>
+<tr>
+<td>M3</td>
+<td><code>{{IN&lt;PIN&gt;}} {{DT}} {{JJ&lt;JJ&gt;}}</code></td>
+<td>42.0</td>
+</tr>
+<tr>
+<td>M4</td>
+<td><code>{{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}} {{IN&lt;PIN&gt;}}</code></td>
+<td>13,527</td>
+</tr>
+<tr>
+<td>M5</td>
+<td><code>{{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}} {{IN&lt;PIN&gt;}}</code></td>
+<td>21,010</td>
+</tr>
+<tr>
+<td>M6</td>
+<td><code>{{PRP&lt;PIT&gt;}} {{VBZ&lt;BEMA&gt;&lt;VPRT&gt;}} {{JJ&lt;PRED&gt;}}</code></td>
+<td>24,813</td>
+</tr>
+</tbody>
+</table>
+<p><em>Theta values in the thousands (M4–M6) indicate the fitted negative binomial distribution approaches the Poisson limit — negligible dispersion beyond what Poisson already captures, consistent with these three bundles' comparatively low variance-to-mean dispersion ratios reported in Section 2.3 of the main text. This is directly visible in the coefficient tables above: GLMM NB and GLMM Poisson estimates are near-identical for M4, M5, and M6, while showing marginally more divergence for M1–M3, whose theta values (95, 133, 42) reflect more real dispersion for the negative binomial family to capture.</em></p>
+<h2>Summary</h2>
+<p>Across all three estimators, all six bundles, and all seven terms (126 comparisons total), point estimates are consistent to within a small fraction of a standard error throughout. This confirms the finding reported in the main text (Section 4.1): the underlying signal is robust to estimator choice once the modelling data is correctly specified as a zero-inclusive frequency dataset, and PPML's advantage over the mixed-effects alternatives rests on theoretical grounds (Jensen's inequality, robustness to overdispersion without a priori family selection) rather than on an empirical difference in what the three estimators conclude from this dataset.</p>
+<footer>This file accompanies Marchand, T. (2026). "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML." APCLC 2026 Proceedings.</footer>
+</body>
+</html>

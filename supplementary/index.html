@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supplementary Materials — Index</title>
+
+<style>
+  :root {
+    --text: #1a1a1a; --muted: #595959; --border: #d8d8d8;
+    --bg-code: #f6f6f6; --accent: #1a5276; --bg-head: #eaeaea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--text); max-width: 860px; margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem; line-height: 1.6; font-size: 17px;
+  }
+  h1 { font-size: 1.7rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; color: var(--accent); margin-top: 2.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.6rem; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: 'SF Mono', Consolas, Menlo, monospace; font-size: 0.88em;
+    background: var(--bg-code); padding: 0.15em 0.4em; border-radius: 3px;
+  }
+  pre {
+    background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1rem 1.2rem; overflow-x: auto; font-size: 0.86em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.92em; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg-head); font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+           color: var(--muted); font-size: 0.88rem; font-style: italic; }
+  nav.crumbs { font-size: 0.88rem; margin-bottom: 1.5rem; }
+  nav.crumbs a { text-decoration: none; }
+  strong { color: #111; }
+</style>
+
+</head>
+<body>
+<h1>Supplementary Materials</h1>
+<p>Supplementary materials for Marchand, T. (2026). "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML." <em>APCLC 2026 Proceedings</em>.</p>
+<p>Referenced in the paper's Supplementary Materials statement (after Acknowledgements). This repository contains data too extensive for the page-limited main text: full coefficient tables across three estimators, the restricted-vs-full Wald test comparisons underlying the topic-effect statistics in Section 4.2, a case study in estimator separation referenced in Section 3.5, and the complete concordance output underlying the lexical realisation analysis in Section 4.3.</p>
+<h2>Contents</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+<th>Referenced in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="coefficient-tables.html"><code>coefficient-tables.html</code></a></td>
+<td>Full PPML / GLMM Poisson / GLMM Negative Binomial coefficient tables, all six bundles, all seven terms</td>
+<td>Section 4.1</td>
+</tr>
+<tr>
+<td><a href="wald-tests.html"><code>wald-tests.html</code></a></td>
+<td>Restricted-vs-full model Wald test comparisons, all six bundles</td>
+<td>Section 4.2</td>
+</tr>
+<tr>
+<td><a href="wh-suasive-case.html"><code>wh-suasive-case.html</code></a></td>
+<td>Case study: separation as a distinct GLM failure mode, illustrated via the excluded wh-suasive frame</td>
+<td>Section 3.5</td>
+</tr>
+<tr>
+<td><code>concordance/*.csv</code></td>
+<td>Full KWIC concordance line data (all hits, JPN + NS), one file per bundle</td>
+<td>Section 4.3</td>
+</tr>
+<tr>
+<td><code>entropy/*.csv</code></td>
+<td>TTR and normalised entropy summary statistics, one file per bundle</td>
+<td>Section 4.3, Table 3</td>
+</tr>
+</tbody>
+</table>
+<h2>Bundle reference</h2>
+<p>All files use the paper's M1–M6 labelling, plus the two bundles excluded from the confirmatory regression analysis under the corrected DP criterion (Section 3.5).</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Feature bundle</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M1</td>
+<td><code>{{DT}} {{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}}</code></td>
+<td>Modelled (underused)</td>
+</tr>
+<tr>
+<td>M2</td>
+<td><code>{{.}} {{RB&lt;RB&gt;}} {{,}}</code></td>
+<td>Modelled (overused)</td>
+</tr>
+<tr>
+<td>M3</td>
+<td><code>{{IN&lt;PIN&gt;}} {{DT}} {{JJ&lt;JJ&gt;}}</code></td>
+<td>Modelled (underused)</td>
+</tr>
+<tr>
+<td>M4</td>
+<td><code>{{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}} {{IN&lt;PIN&gt;}}</code></td>
+<td>Modelled (overused)</td>
+</tr>
+<tr>
+<td>M5</td>
+<td><code>{{JJ&lt;JJ&gt;}} {{NN&lt;NN&gt;}} {{IN&lt;PIN&gt;}}</code></td>
+<td>Modelled (underused)</td>
+</tr>
+<tr>
+<td>M6</td>
+<td><code>{{PRP&lt;PIT&gt;}} {{VBZ&lt;BEMA&gt;&lt;VPRT&gt;}} {{JJ&lt;PRED&gt;}}</code></td>
+<td>Modelled (overused)</td>
+</tr>
+<tr>
+<td>NOMZ</td>
+<td><code>{{DT}} {{JJ&lt;JJ&gt;}} {{NN&lt;NOMZ&gt;}}</code></td>
+<td>Excluded (DP &gt; 0.75)</td>
+</tr>
+<tr>
+<td>WH-SUAV</td>
+<td><code>{{WRB}} {{PRP&lt;FPP1&gt;}} {{VBP&lt;PUBV&gt;&lt;SUAV&gt;&lt;VPRT&gt;}}</code></td>
+<td>Excluded (DP &gt; 0.75)</td>
+</tr>
+</tbody>
+</table>
+<h2>Separation case study (<a href="wh-suasive-case.html"><code>wh-suasive-case.html</code></a>)</h2>
+<p>Documents a supplementary regression diagnostic on the wh-suasive frame — one of the two bundles excluded from the confirmatory analysis under the corrected DP criterion. Regression on this bundle reveals separation (a distinct failure mode from the GLMM panel-construction issue discussed in Section 5.1 of the main text), arising because the bundle has zero occurrences in the entire NS sub-corpus. Includes full PPML and GLMM Poisson output for both the interaction and simplified main-effects specifications, the level × topic cross-tabulation confirming the zero cells, and concordance evidence showing the bundle's rare learner-side usage is itself dominated by a single formula (<em>why I agree</em>, 44 of 46 tokens).</p>
+<h2>Concordance files (<code>concordance/</code>)</h2>
+<p>One CSV per bundle, generated via the MDA Tagger's concordancing function (Section 3.4 of the main text), containing every hit across both JPN and NS sub-corpora. A <code>concordance.zip</code> archive bundling all per-bundle files is also provided for convenience if you want everything at once, rather than downloading each bundle's file individually.</p>
+<p><strong>Filenames:</strong> <code>concordance_&lt;label&gt;.csv</code> (e.g. <code>concordance_M1.csv</code>, <code>concordance_M4.csv</code>, <code>concordance_NOMZ.csv</code>)</p>
+<p><strong>Columns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>File</code></td>
+<td>Source file ID (e.g. <code>W_JPN_PTJ_A2_0_066</code>)</td>
+</tr>
+<tr>
+<td><code>Category</code></td>
+<td>Sub-corpus (<code>JPN</code> or <code>ENS</code>)</td>
+</tr>
+<tr>
+<td><code>Left</code></td>
+<td>Left context (up to 5 tokens)</td>
+</tr>
+<tr>
+<td><code>Node</code></td>
+<td>The matched bundle realisation</td>
+</tr>
+<tr>
+<td><code>Right</code></td>
+<td>Right context (up to 5 tokens)</td>
+</tr>
+<tr>
+<td><code>Freq</code></td>
+<td>Corpus-wide frequency of this specific lexical realisation</td>
+</tr>
+<tr>
+<td><code>TTR</code></td>
+<td>Running type-token ratio at this row (cumulative, as displayed in the tool)</td>
+</tr>
+</tbody>
+</table>
+<h2>Entropy summary files (<code>entropy/</code>)</h2>
+<p>One CSV per bundle, giving the aggregate statistics underlying Table 3 of the main text. An <code>entropy.zip</code> archive bundling all per-bundle files is also provided for convenience.</p>
+<p><strong>Filenames:</strong> <code>entropy_&lt;label&gt;.csv</code> (e.g. <code>entropy_M1.csv</code>)</p>
+<p><strong>Columns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Category</code></td>
+<td>Sub-corpus (<code>JPN</code> or <code>ENS</code>)</td>
+</tr>
+<tr>
+<td><code>Hits</code></td>
+<td>Total tokens (occurrences) of the bundle in this sub-corpus</td>
+</tr>
+<tr>
+<td><code>Types</code></td>
+<td>Number of distinct lexical realisations</td>
+</tr>
+<tr>
+<td><code>TTR</code></td>
+<td>Types / Hits</td>
+</tr>
+<tr>
+<td><code>Entropy</code></td>
+<td>Normalised Shannon entropy (H_norm), 0–1</td>
+</tr>
+</tbody>
+</table>
+<h2>Notes on cross-checking</h2>
+<p>Every number reported in the main text and in <a href="coefficient-tables.html"><code>coefficient-tables.html</code></a> / <a href="wald-tests.html"><code>wald-tests.html</code></a> / <a href="wh-suasive-case.html"><code>wh-suasive-case.html</code></a> was checked against these underlying files before publication (TTR = Types/Hits verified row by row). If you find a discrepancy, please open an issue.</p>
+<hr />
+<p><em>Corresponding data pipeline and tagging software: <a href="https://github.com/timmarchand/mda_tagger">MDA Tagger</a>.</em></p>
+<footer>Supplementary materials for Marchand, T. (2026). "The Gravity of Evaluation: Modelling Sparse Evaluative Bundle Frequencies in Learner Corpora with PPML." APCLC 2026 Proceedings.</footer>
+</body>
+</html>
