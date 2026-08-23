@@ -33,7 +33,7 @@ All files use the paper's M1–M6 labelling, plus the two bundles excluded from 
 
 Documents a supplementary regression diagnostic on the wh-suasive frame — one of the two bundles excluded from the confirmatory analysis under the corrected DP criterion. Regression on this bundle reveals separation (a distinct failure mode from the GLMM panel-construction issue discussed in Section 5.1 of the main text), arising because the bundle has zero occurrences in the entire NS sub-corpus. Includes full PPML and GLMM Poisson output for both the interaction and simplified main-effects specifications, the level × topic cross-tabulation confirming the zero cells, and concordance evidence showing the bundle's rare learner-side usage is itself dominated by a single formula (*why I agree*, 44 of 46 tokens).
 
-## Concordance files (`concordance/`)
+## Concordance files ([`concordance/`](https://github.com/timmarchand/mda_tagger/tree/main/supplementary/concordance))
 
 One CSV per bundle, generated via the MDA Tagger's concordancing function (Section 3.4 of the main text), containing every hit across both JPN and NS sub-corpora. A `concordance.zip` archive bundling all per-bundle files is also provided for convenience if you want everything at once, rather than downloading each bundle's file individually.
 
@@ -51,7 +51,7 @@ One CSV per bundle, generated via the MDA Tagger's concordancing function (Secti
 | `Freq` | Corpus-wide frequency of this specific lexical realisation |
 | `TTR` | Running type-token ratio at this row (cumulative, as displayed in the tool) |
 
-## Entropy summary files (`entropy/`)
+## Entropy summary files ([`entropy/`](https://github.com/timmarchand/mda_tagger/tree/main/supplementary/entropy))
 
 One CSV per bundle, giving the aggregate statistics underlying Table 3 of the main text. An `entropy.zip` archive bundling all per-bundle files is also provided for convenience.
 
