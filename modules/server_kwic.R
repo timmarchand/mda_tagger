@@ -84,6 +84,38 @@ kwicServer <- function(id, processing_module) {
              csv    = csv_lines())
     })
 
+    # ---- Category filter: repopulate the dropdown from whatever values
+    #      actually exist in the metadata column of the active corpus. This
+    #      makes no assumption about what "meta" holds (a corpus label like
+    #      HYSOC/JUSOC, a genre, or nothing at all) -- it just reflects
+    #      reality, and degrades to a single "All" choice with no effect
+    #      when there's no metadata to filter on. ----
+    observe({
+      corpus <- active_corpus()
+      metas  <- if (is.null(corpus) || length(corpus) == 0) {
+        character(0)
+      } else {
+        vapply(corpus, function(d) {
+          if (is.null(d$meta) || is.na(d$meta)) "" else as.character(d$meta)
+        }, character(1))
+      }
+      cats <- sort(unique(metas[metas != ""]))
+      choices <- c("All" = "all", setNames(cats, cats))
+      updateSelectInput(session, "category_filter", choices = choices, selected = "all")
+    })
+
+    # ---- Restrict a corpus list to documents whose meta matches the
+    #      selected category. "all" (or anything falsy) is a no-op. Shared
+    #      by both the main KWIC search and the Tag Inspector below, so a
+    #      single dropdown scopes both to one corpus/category at a time. ----
+    apply_category_filter <- function(corpus, category) {
+      if (is.null(corpus) || length(corpus) == 0) return(corpus)
+      if (is.null(category) || category == "all") return(corpus)
+      Filter(function(d) {
+        !is.null(d$meta) && !is.na(d$meta) && as.character(d$meta) == category
+      }, corpus)
+    }
+
     # ---- Regex escape helper ----
     regex_escape <- function(x) {
       str_replace_all(x, "([.\\^$*+?()\\[\\]{}|\\\\])", "\\\\\\1")
@@ -199,6 +231,36 @@ kwicServer <- function(id, processing_module) {
       paste0("{{", ifelse(nchar(raw_tag) == 0, "—", raw_tag), "}}")
     }
 
+    # ---- Recall-proxy helper: does a hit's tag window carry the expected
+    #      pattern tag anywhere in it? Used to auto-flag each Tag Inspector
+    #      hit as a match or a (candidate) recall miss, per the "any
+    #      occurrence not tagged as the pattern" rule -- a fixed substring
+    #      check against each token's raw tag, since Biber tags stack
+    #      (e.g. "CC<PHC><CONJ>") and the target may be one of several. ----
+    tag_hits_expected <- function(raw_tags, expected_tag) {
+      if (length(raw_tags) == 0) return(FALSE)
+      expected_tag <- trimws(expected_tag)
+      if (!nzchar(expected_tag)) return(FALSE)
+
+      # The tag line under each Tag Inspector hit shows one {{TAG}} per
+      # token, so for a multi-word query like "I think" it reads
+      # "{{PRP<FPP1>}} {{VBP<PRIV><VPRT>}}" -- and that whole line is
+      # exactly what a user will naturally copy and paste in here, not just
+      # a single tag. Pull out every {{...}} group present; if there isn't
+      # one (a bare tag like "PRIV"), treat the whole string as one target.
+      targets <- regmatches(expected_tag, gregexpr("\\{\\{[^}]+\\}\\}", expected_tag))[[1]]
+      targets <- if (length(targets) > 0) gsub("^\\{\\{|\\}\\}$", "", targets) else expected_tag
+
+      # Require EVERY pasted target tag to appear somewhere in the hit's
+      # tag window, not just any one of them -- this is what makes pasting
+      # the full multi-tag line a genuine check ("was this whole sequence
+      # reproduced for this occurrence too?") rather than a trivially-true
+      # one (which an OR over the same tags the line came from would be).
+      all(vapply(targets, function(target) {
+        any(vapply(raw_tags, function(t) grepl(target, t, fixed = TRUE), logical(1)))
+      }, logical(1)))
+    }
+
     # ---- Find occurrences of a query n-gram and pair each token with its tag ----
     # max_examples = Inf shows every occurrence found ("All")
     tag_inspect <- function(corpus, query, window, case_sensitive, max_examples = Inf) {
@@ -282,10 +344,21 @@ kwicServer <- function(id, processing_module) {
       line1 <- paste0(left_str, paste(word_cells, collapse = " "), right_str)
       line2 <- paste0(pad, paste(tag_cells, collapse = " "))
 
+      # Match/miss badge -- only shown when an expected tag was supplied
+      # (row$match is NA otherwise, meaning "not being checked").
+      match_badge <- if (is.null(row$match) || is.na(row$match)) {
+        ""
+      } else if (isTRUE(row$match)) {
+        "<span style='background:#d4f7d4;color:#1a7a1a;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:bold;margin-left:8px;'>✅ MATCH</span>"
+      } else {
+        "<span style='background:#ffd6d6;color:#a71d1d;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:bold;margin-left:8px;'>❌ MISS</span>"
+      }
+
       header <- paste0(
         "<div style='color:#888;font-size:11px;margin-top:10px;'>",
         esc(row$file_id),
         if (!is.na(row$meta)) paste0(" &nbsp;|&nbsp; ", esc(row$meta)) else "",
+        match_badge,
         "</div>"
       )
 
@@ -300,9 +373,9 @@ kwicServer <- function(id, processing_module) {
 
     # ---- Reactive: run tag inspector on button click ----
     inspect_results <- eventReactive(input$run_inspect, {
-      corpus <- active_corpus()
+      corpus <- apply_category_filter(active_corpus(), input$category_filter)
       validate(need(!is.null(corpus) && length(corpus) > 0,
-                    "No data available. Please process texts or upload .txt files."))
+                    "No data available for this category. Please process texts, upload .txt files, or choose a different category filter."))
       validate(need(nchar(trimws(input$inspect_query)) > 0,
                     "Please enter a word or phrase to inspect."))
 
@@ -322,6 +395,16 @@ kwicServer <- function(id, processing_module) {
 
       validate(need(nrow(hits) > 0,
                     paste0('No occurrences of "', input$inspect_query, '" found.')))
+
+      # Recall-proxy flag: if an expected tag was given, mark every hit as a
+      # match or a miss; otherwise leave it NA (unflagged) for every row.
+      expected_tag <- trimws(input$inspect_expected_tag %||% "")
+      hits$match <- if (nzchar(expected_tag)) {
+        vapply(hits$node_tags, tag_hits_expected, logical(1), expected_tag = expected_tag)
+      } else {
+        NA
+      }
+
       hits
     })
 
@@ -329,9 +412,23 @@ kwicServer <- function(id, processing_module) {
       hits   <- inspect_results()
       blocks <- vapply(seq_len(nrow(hits)), function(i) render_inspect_block(hits[i, ]),
                        character(1))
+
+      # When an expected tag was set, add a match/miss tally next to the
+      # count -- the at-a-glance recall-proxy summary for this lexical form.
+      match_summary <- if (!all(is.na(hits$match))) {
+        n_match <- sum(hits$match, na.rm = TRUE)
+        n_miss  <- sum(!hits$match, na.rm = TRUE)
+        paste0(
+          " &nbsp;|&nbsp; <strong style='color:#1a7a1a;'>", n_match, " match</strong>",
+          " &nbsp;<strong style='color:#a71d1d;'>", n_miss, " miss</strong>"
+        )
+      } else {
+        ""
+      }
+
       HTML(paste0(
         "<div style='font-size:11px;color:#888;margin-bottom:2px;'>Showing ", nrow(hits),
-        " example", if (nrow(hits) != 1) "s" else "", "</div>",
+        " example", if (nrow(hits) != 1) "s" else "", match_summary, "</div>",
         paste(blocks, collapse = "")
       ))
     })
@@ -360,7 +457,8 @@ kwicServer <- function(id, processing_module) {
             left    = row$left,
             node    = paste(row$node_words[[1]], collapse = " "),
             tags    = paste(wrap_tag(row$node_tags[[1]]), collapse = " "),
-            right   = row$right
+            right   = row$right,
+            match   = row$match  # NA unless an expected tag was set above
           )
         })
         readr::write_csv(out, file)
@@ -439,9 +537,9 @@ kwicServer <- function(id, processing_module) {
                        type = "message", duration = NULL)
       on.exit(removeNotification("kwic_running"), add = TRUE)
 
-      corpus <- active_corpus()
+      corpus <- apply_category_filter(active_corpus(), input$category_filter)
       validate(need(!is.null(corpus) && length(corpus) > 0,
-                    "No data available. Please process texts or upload .txt files."))
+                    "No data available for this category. Please process texts, upload .txt files, or choose a different category filter."))
 
       is_token <- input$search_mode == "token"
 
@@ -605,7 +703,18 @@ kwicServer <- function(id, processing_module) {
       },
       content = function(file) {
         req(kwic_results())
-        readr::write_csv(kwic_results(), file)
+        out <- kwic_results()
+
+        # Precision-check workflow: Tag Bundle search + Random sample mode
+        # produces exactly "a random sample of hits for this pattern" (see
+        # the help text above the Tag Bundle box) -- add a blank column here
+        # for the hand-coded correctness judgment, so the download is ready
+        # to annotate rather than needing a column added in Excel first.
+        if (isTRUE(input$search_mode == "tag") && isTRUE(input$mode == "random")) {
+          out$tag_correct <- NA
+        }
+
+        readr::write_csv(out, file)
       },
       contentType = "text/csv"
     )

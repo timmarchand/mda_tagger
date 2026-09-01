@@ -12,6 +12,69 @@ kwicUI <- function(id) {
 
   tagList(
 
+    # Tagger-accuracy audit guide — collapsed by default so it stays out of
+    # the way day to day, but gives the full step-by-step workflow for both
+    # halves of the audit (Section 3.6) in one place instead of scattered
+    # one-line hints next to the relevant controls.
+    fluidRow(
+      box(
+        title = "📖 How to Test Tagger Precision & Recall",
+        width = 12,
+        status = "warning",
+        solidHeader = TRUE,
+        collapsible = TRUE,
+        collapsed = TRUE,
+
+        h5("Precision check"),
+        p(class = "text-muted", style = "font-size: 12px;",
+          "For a given pattern, draw a random sample of its tagged hits and hand-check each ",
+          "one for whether the full tag sequence is correct."),
+        tags$ol(
+          style = "font-size: 12px;",
+          tags$li("Below, set ", strong("Search mode"), " to \"Tag Bundle\"."),
+          tags$li("Enter the pattern's tag in ", tags$code("{{TAG}}"), " form, e.g. ",
+                  tags$code("{{PHC}}"), " — or a fuller bundle like ",
+                  tags$code("{{DT<QUAN>}} {{JJ<JJ>}}"), "."),
+          tags$li("Set ", strong("Line selection"), " to \"Random sample\"."),
+          tags$li("Set ", strong("Max lines to display"), " to 50 (or your target sample ",
+                  "size) — if fewer hits exist, you'll get all of them instead."),
+          tags$li("Optional: use ", strong("Filter to category"), " above the search mode to ",
+                  "scope the sample to one corpus at a time."),
+          tags$li("Click ", strong("Run KWIC"), ", then ", strong("Download Results (CSV)"),
+                  ". The file includes a blank ", tags$code("tag_correct"), " column — fill ",
+                  "in your judgment per hit."),
+          tags$li("Repeat once per pattern, and once per corpus if you're scoping by category.")
+        ),
+
+        hr(),
+
+        h5("Recall proxy"),
+        p(class = "text-muted", style = "font-size: 12px;",
+          "For a pattern's most frequent lexical realisations, check the raw text for any ",
+          "occurrence that wasn't tagged as the pattern."),
+        tags$ol(
+          style = "font-size: 12px;",
+          tags$li("Identify the pattern's top 5 lexical realisations (e.g. from your ",
+                  "lexical-realisation profiling)."),
+          tags$li("In the ", strong("🏷️ Tag Inspector"), " box below, type one realisation ",
+                  "into \"Word or phrase to inspect\"."),
+          tags$li("Enter the pattern's tag into ", strong("Expected tag"), " — same ",
+                  tags$code("{{TAG}}"), " format, braces optional. You can paste it straight ",
+                  "from the Tag Bundle box above, or from the tag line under a result below."),
+          tags$li("Pasting more than one ", tags$code("{{TAG}}"), " (e.g. the whole tag line ",
+                  "for a multi-word query) requires ", strong("all"), " of them to be present ",
+                  "for a match — useful for checking a whole expected sequence, not just one tag."),
+          tags$li("Optional: use ", strong("Filter to category"), " above to scope to one corpus."),
+          tags$li("Click ", strong("🏷️ Show Tags"), ". Each hit is flagged ",
+                  HTML("<span style='color:#1a7a1a;font-weight:bold;'>✅ MATCH</span>"), " or ",
+                  HTML("<span style='color:#a71d1d;font-weight:bold;'>❌ MISS</span>"),
+                  ", with a running tally at the top — any miss is a candidate recall miss."),
+          tags$li("Download (CSV) for a ", tags$code("match"), " column in your records."),
+          tags$li("Repeat per lexical realisation, per pattern, per corpus.")
+        )
+      )
+    ),
+
     fluidRow(
 
       # Search Controls
@@ -51,6 +114,22 @@ kwicUI <- function(id) {
           p(class = "text-muted", style = "font-size: 11px;",
             "CSV must have doc_id and tagged_text columns; metadata column optional.")
         ),
+
+        hr(),
+
+        # Category filter — scopes BOTH the KWIC search below and the Tag
+        # Inspector box further down the page. Populated dynamically from
+        # whatever values exist in the metadata column, so it works whether
+        # that column holds a corpus label (e.g. HYSOC/JUSOC), a genre, or
+        # anything else; if there's no metadata at all, this has no effect.
+        selectInput(
+          ns("category_filter"),
+          "Filter to category (optional):",
+          choices  = c("All" = "all"),
+          selected = "all"
+        ),
+        p(class = "text-muted", style = "font-size: 10px; margin-top: -8px;",
+          "Scopes both the search below and the Tag Inspector box further down the page."),
 
         hr(),
 
@@ -200,11 +279,12 @@ kwicUI <- function(id) {
           "Each example shows a concordance line with a parallel line of tags underneath, ",
           "aligned token by token. Tags are shown in the same {{TAG}} format as the ",
           "Tag Bundle box above, so you can copy a tag line and paste it there to search ",
-          "for that exact pattern."),
+          "for that exact pattern. See \"How to Test Tagger Precision & Recall\" above for ",
+          "the full recall-check workflow using Expected tag below."),
 
         fluidRow(
           column(
-            width = 5,
+            width = 4,
             textInput(
               ns("inspect_query"),
               "Word or phrase to inspect:",
@@ -213,10 +293,19 @@ kwicUI <- function(id) {
           ),
           column(
             width = 3,
-            checkboxInput(ns("inspect_case"), "Case sensitive", value = FALSE)
+            textInput(
+              ns("inspect_expected_tag"),
+              "Expected tag (optional):",
+              placeholder = "e.g.  {{PHC}}"
+            )
           ),
           column(
-            width = 4,
+            width = 2,
+            div(style = "margin-top: 25px;",
+                checkboxInput(ns("inspect_case"), "Case sensitive", value = FALSE))
+          ),
+          column(
+            width = 3,
             div(style = "margin-top: 25px;",
                 actionButton(ns("run_inspect"), "🏷️ Show Tags", class = "btn-success btn-block"))
           )
@@ -257,7 +346,8 @@ kwicUI <- function(id) {
           )
         ),
 
-        uiOutput(ns("inspect_output"))      )
+        uiOutput(ns("inspect_output"))
+      )
     )
   )
 }
