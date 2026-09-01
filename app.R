@@ -16,10 +16,11 @@ ui <- dashboardPage(
     sidebarMenu(
       id = "tabs",
       menuItem("1. Upload Data", tabName = "upload", icon = icon("upload")),
-      menuItem("2. Process & Tag", tabName = "process", icon = icon("cogs")),
-      menuItem("3. Results", tabName = "results", icon = icon("chart-bar")),
-      menuItem("4. KWIC", tabName = "kwic", icon = icon("search")),
-      menuItem("5. Export", tabName = "export", icon = icon("download"))
+      menuItem("2. Check Tokenization", tabName = "tokencheck", icon = icon("magnifying-glass")),
+      menuItem("3. Process & Tag", tabName = "process", icon = icon("cogs")),
+      menuItem("4. Results", tabName = "results", icon = icon("chart-bar")),
+      menuItem("5. KWIC", tabName = "kwic", icon = icon("search")),
+      menuItem("6. Export", tabName = "export", icon = icon("download"))
     ),
     hr(),
     div(
@@ -52,7 +53,17 @@ ui <- dashboardPage(
         dataInputUI("data_input")
       ),
 
-      # Tab 2: Process ----
+      # Tab 2: Tokenization Check ----
+      tabItem(
+        tabName = "tokencheck",
+        h2("🔎 Tokenization Check"),
+        p("Catch a common data problem before tagging: sentences that run together ",
+          "with no space after the period."),
+        br(),
+        tokenCheckUI("token_check")
+      ),
+
+      # Tab 3: Process ----
       tabItem(
         tabName = "process",
         h2("⚙️ Processing & Tagging"),
@@ -61,7 +72,7 @@ ui <- dashboardPage(
         processingUI("processing")
       ),
 
-      # Tab 3: Results ----
+      # Tab 4: Results ----
       tabItem(
         tabName = "results",
         h2("📊 Results & Visualization"),
@@ -70,10 +81,10 @@ ui <- dashboardPage(
         resultsUI("results")
       ),
 
-      # Tab 4: KWIC ----
+      # Tab 5: KWIC ----
       tabItem(tabName = "kwic", kwicUI("kwic")),
 
-      # Tab 5: Export ----
+      # Tab 6: Export ----
       tabItem(
         tabName = "export",
         h2("💾 Export Results"),
@@ -93,8 +104,14 @@ server <- function(input, output, session) {
   # Call data input module
   data_module <- dataInputServer("data_input")
 
+  # Tokenization check sits between data input and processing: it passes
+  # data_module's text straight through unless the user has clicked
+  # "Fix All", in which case it substitutes the cleaned version. Same
+  # return shape as dataInputServer(), so it's a drop-in replacement below.
+  token_check_module <- tokenCheckServer("token_check", data_module, session)
+
   # Call processing module (pass session for tab switching)
-  processing_module <- processingServer("processing", data_module, session)
+  processing_module <- processingServer("processing", token_check_module, session)
 
   # Call results module
   resultsServer("results", processing_module)
@@ -128,10 +145,10 @@ server <- function(input, output, session) {
       cat("  Texts:", length(data$text), "\n")
       cat("  Doc IDs:", paste(head(data$doc_ids, 3), collapse = ", "), "...\n")
       cat("  Metadata:", paste(head(unique(data$meta), 3), collapse = ", "), "\n\n")
-      # Auto-switch to processing tab
-      updateTabItems(session, "tabs", "process")
+      # Auto-switch to the tokenization check tab (before processing)
+      updateTabItems(session, "tabs", "tokencheck")
       showNotification(
-        "Data loaded! Switched to Processing tab.",
+        "Data loaded! Switched to the Tokenization Check tab.",
         type = "message",
         duration = 3
       )

@@ -87,6 +87,10 @@ source("modules/ui_data_input.R")
 source("modules/server_data_input.R")
 cat("   ✓ Data input module loaded\n")
 
+source("modules/ui_tokencheck.R")
+source("modules/server_tokencheck.R")
+cat("   ✓ Tokenization check module loaded\n")
+
 source("modules/ui_processing.R")
 source("modules/server_processing.R")
 cat("   ✓ Processing module loaded\n")
@@ -105,5 +109,3 @@ cat("   ✓ KWIC module loaded\n")
 
 source("modules/tag_guide.R")
 cat("   ✓ Tag guide module loaded\n")
-
-
