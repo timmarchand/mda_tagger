@@ -185,6 +185,79 @@ kwicUI <- function(id) {
           DT::dataTableOutput(ns("meta_ttr_table"))
         )
       )
+    ),
+
+    # Tag Inspector
+    fluidRow(
+      box(
+        title = "🏷️ Tag Inspector",
+        width = 12,
+        status = "success",
+        solidHeader = TRUE,
+
+        p(class = "text-muted", style = "font-size: 12px;",
+          "Look up a word or phrase and see exactly how the tagger tagged it. ",
+          "Each example shows a concordance line with a parallel line of tags underneath, ",
+          "aligned token by token. Tags are shown in the same {{TAG}} format as the ",
+          "Tag Bundle box above, so you can copy a tag line and paste it there to search ",
+          "for that exact pattern."),
+
+        fluidRow(
+          column(
+            width = 5,
+            textInput(
+              ns("inspect_query"),
+              "Word or phrase to inspect:",
+              placeholder = "e.g.  and so on"
+            )
+          ),
+          column(
+            width = 3,
+            checkboxInput(ns("inspect_case"), "Case sensitive", value = FALSE)
+          ),
+          column(
+            width = 4,
+            div(style = "margin-top: 25px;",
+                actionButton(ns("run_inspect"), "🏷️ Show Tags", class = "btn-success btn-block"))
+          )
+        ),
+
+        fluidRow(
+          column(
+            width = 5,
+            sliderInput(
+              ns("inspect_window"),
+              "Context window (tokens):",
+              min   = 2,
+              max   = 10,
+              value = 5,
+              step  = 1
+            )
+          ),
+          column(
+            width = 3,
+            selectInput(
+              ns("inspect_n"),
+              "Examples to show:",
+              choices  = c("5" = "5", "10" = "10", "20" = "20", "50" = "50", "All" = "all"),
+              selected = "5"
+            )
+          ),
+          column(
+            width = 4,
+            conditionalPanel(
+              condition = paste0("output['", ns("inspect_has_results"), "']"),
+              div(style = "margin-top: 25px;",
+                  downloadButton(
+                    ns("download_inspect_csv"),
+                    "Download (CSV)",
+                    class = "btn-success btn-sm btn-block"
+                  ))
+            )
+          )
+        ),
+
+        uiOutput(ns("inspect_output"))      )
     )
   )
 }

@@ -190,6 +190,184 @@ kwicServer <- function(id, processing_module) {
       })
     }
 
+    # =========================================================================
+    # Tag Inspector: look up a word/phrase and show it aligned with its tags
+    # =========================================================================
+
+    # ---- Wrap a raw tag in the {{ }} bundle format (or a placeholder if untagged) ----
+    wrap_tag <- function(raw_tag) {
+      paste0("{{", ifelse(nchar(raw_tag) == 0, "—", raw_tag), "}}")
+    }
+
+    # ---- Find occurrences of a query n-gram and pair each token with its tag ----
+    # max_examples = Inf shows every occurrence found ("All")
+    tag_inspect <- function(corpus, query, window, case_sensitive, max_examples = Inf) {
+      flag    <- if (case_sensitive) "" else "(?i)"
+      words   <- str_split(trimws(query), "\\s+")[[1]]
+      pattern <- paste0(flag, "\\b", paste(map_chr(words, regex_escape), collapse = "\\s+"), "\\b")
+      n_words <- length(words)
+
+      hits <- map_dfr(corpus, function(doc) {
+        raw <- doc$lines
+        n   <- length(raw)
+        if (n < n_words) return(tibble())
+
+        # token = everything before the first "_"; tag = everything after it
+        # (works whether tags are bracketed "{{POS<SUB>}}" or plain "POS<SUB>")
+        tkns <- str_extract(raw, "^.+?(?=_)")
+        tkns <- ifelse(is.na(tkns), raw, tkns)
+        tags <- str_extract(raw, "(?<=_).*$")
+        tags <- str_remove_all(ifelse(is.na(tags), "", tags), "[{}]")
+
+        hit_positions <- c()
+        for (i in seq_len(n - n_words + 1)) {
+          chunk <- paste(tkns[i:(i + n_words - 1)], collapse = " ")
+          if (grepl(pattern, chunk, perl = TRUE)) hit_positions <- c(hit_positions, i)
+        }
+        if (length(hit_positions) == 0) return(tibble())
+
+        map_dfr(hit_positions, function(pos) {
+          node_end <- pos + n_words - 1
+          tibble(
+            file_id    = doc$file_id,
+            meta       = doc$meta,
+            left       = get_left_context(tkns, pos, window),
+            right      = get_right_context(tkns, node_end, window, n),
+            node_words = list(tkns[pos:node_end]),
+            node_tags  = list(tags[pos:node_end])
+          )
+        })
+      })
+
+      if (nrow(hits) > 0 && is.finite(max_examples) && nrow(hits) > max_examples) {
+        hits <- hits[seq_len(max_examples), ]
+      }
+      hits
+    }
+
+    # ---- Render one hit as an aligned "words above / tags below" HTML block ----
+    render_inspect_block <- function(row) {
+      esc <- htmltools::htmlEscape
+
+      words <- row$node_words[[1]]
+      raw_tags <- row$node_tags[[1]]
+
+      # Wrap each tag in {{ }} -- the exact format the Tag Bundle search box
+      # above expects (see placeholder "e.g. {{DT}} {{JJ}}") -- so the whole
+      # tag line can be copied and pasted straight into it. An untagged token
+      # still gets a bracketed placeholder so the position lines up with its
+      # word; it just won't match anything if pasted (no token is tagged "—").
+      disp_tags <- wrap_tag(raw_tags)
+
+      widths <- pmax(nchar(words), nchar(disp_tags), 1)
+
+      # pad the RAW text first so column widths are correct, then escape —
+      # escaping can lengthen the string (e.g. "<" -> "&lt;") without changing
+      # its rendered width, so padding must happen before escaping.
+      pad_token <- function(x, w) formatC(x, width = w, flag = "-")
+
+      word_cells <- mapply(function(w, wd) {
+        paste0("<span style='color:#2c7bb6;font-weight:bold;'>",
+               esc(pad_token(w, wd)), "</span>")
+      }, words, widths)
+
+      tag_cells <- mapply(function(t, wd) {
+        paste0("<span style='color:#d7191c;'>", esc(pad_token(t, wd)), "</span>")
+      }, disp_tags, widths)
+
+      left_str  <- if (nchar(row$left)  > 0) paste0(esc(row$left),  " ") else ""
+      right_str <- if (nchar(row$right) > 0) paste0(" ", esc(row$right)) else ""
+      pad       <- strrep(" ", nchar(row$left) + (if (nchar(row$left) > 0) 1 else 0))
+
+      line1 <- paste0(left_str, paste(word_cells, collapse = " "), right_str)
+      line2 <- paste0(pad, paste(tag_cells, collapse = " "))
+
+      header <- paste0(
+        "<div style='color:#888;font-size:11px;margin-top:10px;'>",
+        esc(row$file_id),
+        if (!is.na(row$meta)) paste0(" &nbsp;|&nbsp; ", esc(row$meta)) else "",
+        "</div>"
+      )
+
+      paste0(
+        header,
+        "<pre style='margin:2px 0 6px 0;white-space:pre-wrap;word-break:break-word;",
+        "background:#f7f7f9;padding:6px 8px;border-radius:4px;'>",
+        line1, "\n", line2,
+        "</pre>"
+      )
+    }
+
+    # ---- Reactive: run tag inspector on button click ----
+    inspect_results <- eventReactive(input$run_inspect, {
+      corpus <- active_corpus()
+      validate(need(!is.null(corpus) && length(corpus) > 0,
+                    "No data available. Please process texts or upload .txt files."))
+      validate(need(nchar(trimws(input$inspect_query)) > 0,
+                    "Please enter a word or phrase to inspect."))
+
+      max_ex <- if (is.null(input$inspect_n) || input$inspect_n == "all") {
+        Inf
+      } else {
+        as.numeric(input$inspect_n)
+      }
+
+      hits <- tag_inspect(
+        corpus         = corpus,
+        query          = input$inspect_query,
+        window         = if (!is.null(input$inspect_window)) input$inspect_window else 5,
+        case_sensitive = input$inspect_case,
+        max_examples   = max_ex
+      )
+
+      validate(need(nrow(hits) > 0,
+                    paste0('No occurrences of "', input$inspect_query, '" found.')))
+      hits
+    })
+
+    output$inspect_output <- renderUI({
+      hits   <- inspect_results()
+      blocks <- vapply(seq_len(nrow(hits)), function(i) render_inspect_block(hits[i, ]),
+                       character(1))
+      HTML(paste0(
+        "<div style='font-size:11px;color:#888;margin-bottom:2px;'>Showing ", nrow(hits),
+        " example", if (nrow(hits) != 1) "s" else "", "</div>",
+        paste(blocks, collapse = "")
+      ))
+    })
+
+    # ---- has_results flag, for showing the download button ----
+    output$inspect_has_results <- reactive({
+      !is.null(inspect_results()) && nrow(inspect_results()) > 0
+    })
+    outputOptions(output, "inspect_has_results", suspendWhenHidden = FALSE)
+
+    # ---- CSV download: one row per example, tags in the same {{TAG}} format ----
+    output$download_inspect_csv <- downloadHandler(
+      filename = function() {
+        query <- str_replace_all(trimws(input$inspect_query), "[^A-Za-z0-9_-]", "_")
+        paste0("tag_inspector_", query, "_", format(Sys.Date(), "%Y%m%d"), ".csv")
+      },
+      content = function(file) {
+        hits <- inspect_results()
+        req(hits, nrow(hits) > 0)
+
+        out <- map_dfr(seq_len(nrow(hits)), function(i) {
+          row <- hits[i, ]
+          tibble(
+            file_id = row$file_id,
+            meta    = row$meta,
+            left    = row$left,
+            node    = paste(row$node_words[[1]], collapse = " "),
+            tags    = paste(wrap_tag(row$node_tags[[1]]), collapse = " "),
+            right   = row$right
+          )
+        })
+        readr::write_csv(out, file)
+      },
+      contentType = "text/csv"
+    )
+
     # ---- Post-processing: add freq/TTR, then apply mode ----
     postprocess_kwic <- function(results, mode, lines = 20, top_n = 5,
                                  seed = 42, is_token = FALSE) {
