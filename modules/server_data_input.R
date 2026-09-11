@@ -51,17 +51,6 @@ dataInputServer <- function(id) {
       if (uploaded_data()$type != "csv") return(NULL)
 
       columns <- names(uploaded_data()$content)
-      df <- uploaded_data()$content
-
-      # Only check character/factor columns excluding the text column for
-      # cardinality warning — the text column will almost always have high
-      # cardinality and isn't a meaningful metadata candidate.
-      candidate_meta_cols <- setdiff(columns, columns[1])
-      candidate_meta_cols <- candidate_meta_cols[sapply(candidate_meta_cols, function(col) {
-        is.character(df[[col]]) || is.factor(df[[col]])
-      })]
-      column_info <- sapply(candidate_meta_cols, function(col) length(unique(df[[col]])))
-      high_cardinality_cols <- names(column_info)[column_info > 20]
 
       tagList(
         hr(),
@@ -93,18 +82,8 @@ dataInputServer <- function(id) {
           selected = NULL
         ),
 
-        # Warning only for high-cardinality metadata candidates
-        if (length(high_cardinality_cols) > 0) {
-          div(
-            style = "margin-top: 10px; padding: 10px; background-color: #fff3cd; border-radius: 4px;",
-            HTML(paste0(
-              "<strong>⚠️ Metadata Warning:</strong><br/>",
-              "These columns have >20 unique values and may not be suitable as metadata categories: ",
-              "<strong>", paste(high_cardinality_cols, collapse = ", "), "</strong><br/>",
-              "Metadata works best with a small number of distinct category labels."
-            ))
-          )
-        },
+        # Notes/warnings scoped to whatever is actually selected above
+        uiOutput(session$ns("meta_selection_notes")),
 
         # Metadata value filter
         conditionalPanel(
@@ -113,6 +92,45 @@ dataInputServer <- function(id) {
           uiOutput(session$ns("meta_value_filter_ui"))
         )
       )
+    })
+
+    # ---- Notes/warnings for the metadata column selection, scoped to what
+    #      is actually selected (not every candidate column in the file) ----
+    output$meta_selection_notes <- renderUI({
+      req(input$meta_column, uploaded_data())
+      if (length(input$meta_column) == 0) return(NULL)
+
+      df <- uploaded_data()$content
+
+      if (length(input$meta_column) > 1) {
+        return(div(
+          style = "margin-top: 10px; padding: 10px; background-color: #d1ecf1; border-radius: 4px;",
+          HTML(paste0(
+            "<strong>ℹ️ Multiple columns selected:</strong><br/>",
+            "These will be combined into a single metadata field, joined with \" | \" ",
+            "(e.g. \"", paste(input$meta_column, collapse = "\" | \""), "\" becomes one combined value per row).<br/>",
+            "If you need these as <strong>separate</strong> variables later (e.g. for factorial or ",
+            "mixed-effects analysis when exporting), keep them as one column here and instead ",
+            "upload a separate metadata CSV at the Export step."
+          ))
+        ))
+      }
+
+      # Single column selected: warn only if THIS column has high cardinality
+      col <- input$meta_column
+      n_unique <- length(unique(df[[col]]))
+      if (n_unique > 20) {
+        div(
+          style = "margin-top: 10px; padding: 10px; background-color: #fff3cd; border-radius: 4px;",
+          HTML(paste0(
+            "<strong>⚠️ Metadata Warning:</strong><br/>",
+            "\"", col, "\" has ", n_unique, " unique values and may not be suitable as a metadata category.<br/>",
+            "Metadata works best with a small number of distinct category labels."
+          ))
+        )
+      } else {
+        NULL
+      }
     })
 
     # Update meta column choices based on text column selection
