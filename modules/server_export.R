@@ -11,6 +11,8 @@
 exportServer <- function(id, processing_module) {
   moduleServer(id, function(input, output, session) {
 
+    ns <- session$ns
+
     # Get processed data
     results_data <- reactive({
       proc <- processing_module()
@@ -18,6 +20,52 @@ exportServer <- function(id, processing_module) {
         return(proc$processed_data)
       }
       return(NULL)
+    })
+
+    # ---- Optional extra metadata for factorial / mixed-effects designs ----
+    extra_metadata <- reactive({
+      req(input$extra_metadata_csv)
+      df <- tryCatch(
+        readr::read_csv(input$extra_metadata_csv$datapath, show_col_types = FALSE),
+        error = function(e) NULL
+      )
+      validate(need(!is.null(df), "Could not read the metadata CSV."))
+      validate(need("doc_id" %in% names(df), "Metadata CSV must have a doc_id column."))
+      df
+    })
+
+    output$factor_selectors <- renderUI({
+      req(extra_metadata())
+      extra_cols <- setdiff(names(extra_metadata()), "doc_id")
+      validate(need(length(extra_cols) > 0,
+                    "No additional columns found besides doc_id."))
+
+      tagList(
+        selectizeInput(
+          ns("factorial_factors"),
+          "Factors for factorial analysis (choose exactly 2 to enable):",
+          choices = extra_cols, multiple = TRUE,
+          options = list(maxItems = 2)
+        ),
+        selectInput(
+          ns("mixed_grouping_var"),
+          "Grouping variable for mixed-effects (e.g. author_id):",
+          choices = c("None" = "", extra_cols)
+        )
+      )
+    })
+
+    results_data_for_stats <- reactive({
+      base <- results_data()
+      req(base)
+      if (is.null(input$extra_metadata_csv)) return(base)
+      em <- extra_metadata()
+      if (is.null(em)) return(base)
+
+      base$doc_id <- as.character(base$doc_id)
+      em$doc_id   <- as.character(em$doc_id)
+
+      dplyr::left_join(base, em, by = "doc_id")
     })
 
     output$data_ready <- reactive({
@@ -190,8 +238,20 @@ exportServer <- function(id, processing_module) {
       zip_dest
     }  # closes build_rproject_zip
 
+        # ---- Helper: fill a template file's {{PLACEHOLDER}} tokens ----
+    fill_template <- function(template_path, replacements) {
+      txt <- readLines(template_path, warn = FALSE)
+      txt <- paste(txt, collapse = "\n")
+      for (key in names(replacements)) {
+        txt <- gsub(paste0("\\{\\{", key, "\\}\\}"), replacements[[key]], txt)
+      }
+      txt
+    }
+
     # ---- Helper: build and zip the Statistical Analysis project ----
-    build_stats_rproject_zip <- function(processed_data, zip_dest) {
+    build_stats_rproject_zip <- function(processed_data, zip_dest,
+                                         factorial_factors = NULL,
+                                         mixed_grouping_var = NULL) {
 
       tmp_root <- file.path(tempdir(), paste0("mda_stats_", Sys.getpid()))
       data_dir <- file.path(tmp_root, "data")
@@ -203,8 +263,12 @@ exportServer <- function(id, processing_module) {
         c("Dimension1", "Dimension2", "Dimension3", "Dimension4", "Dimension5"),
         names(processed_data)
       )
+
+      extra_cols <- unique(c(factorial_factors, mixed_grouping_var))
+      extra_cols <- extra_cols[!is.na(extra_cols) & extra_cols != ""]
+
       scores <- processed_data %>%
-        select(doc_id, any_of("metadata"), any_of("n_words"), all_of(dim_cols))
+        select(doc_id, any_of("metadata"), any_of("n_words"), all_of(dim_cols), any_of(extra_cols))
       readr::write_csv(scores, file.path(data_dir, "dimension_scores.csv"))
 
       file.copy(stats_import_script_path,            file.path(r_dir, "01_import.R"))
@@ -212,6 +276,51 @@ exportServer <- function(id, processing_module) {
       file.copy(stats_group_comparisons_script_path,  file.path(r_dir, "03_group_comparisons.R"))
       file.copy(stats_posthoc_script_path,            file.path(r_dir, "04_posthoc.R"))
       file.copy(stats_readme_path,                    file.path(tmp_root, "README.md"))
+
+      all_files <- c(
+        file.path("data", "dimension_scores.csv"),
+        file.path("R", "01_import.R"),
+        file.path("R", "02_descriptives.R"),
+        file.path("R", "03_group_comparisons.R"),
+        file.path("R", "04_posthoc.R"),
+        "README.md",
+        "MDA_analysis.Rproj"
+      )
+
+      extra_notes <- character(0)
+
+      if (!is.null(factorial_factors) && length(factorial_factors) == 2) {
+        factorial_txt <- fill_template(
+          stats_factorial_template_path,
+          list(FACTOR1 = factorial_factors[1], FACTOR2 = factorial_factors[2])
+        )
+        writeLines(factorial_txt, file.path(r_dir, "05_factorial.R"))
+        all_files <- c(all_files, file.path("R", "05_factorial.R"))
+        extra_notes <- c(extra_notes, paste0(
+          "- R/05_factorial.R - factorial analysis using ",
+          factorial_factors[1], " and ", factorial_factors[2], "."
+        ))
+      }
+
+      if (!is.null(mixed_grouping_var) && nchar(mixed_grouping_var) > 0) {
+        mixed_txt <- fill_template(
+          stats_mixed_template_path,
+          list(GROUPING_VAR = mixed_grouping_var)
+        )
+        writeLines(mixed_txt, file.path(r_dir, "06_mixed_effects.R"))
+        all_files <- c(all_files, file.path("R", "06_mixed_effects.R"))
+        extra_notes <- c(extra_notes, paste0(
+          "- R/06_mixed_effects.R - mixed-effects analysis with (1 | ", mixed_grouping_var, ")."
+        ))
+      }
+
+      if (length(extra_notes) > 0) {
+        cat(
+          "\n\n## Additional analyses included in this export\n\n",
+          paste(extra_notes, collapse = "\n"), "\n",
+          file = file.path(tmp_root, "README.md"), append = TRUE
+        )
+      }
 
       writeLines(paste0(
         "Version: 1.0\n\n",
@@ -223,16 +332,6 @@ exportServer <- function(id, processing_module) {
         "NumSpacesForTab: 2\n",
         "Encoding: UTF-8\n"
       ), file.path(tmp_root, "MDA_analysis.Rproj"))
-
-      all_files <- c(
-        file.path("data", "dimension_scores.csv"),
-        file.path("R", "01_import.R"),
-        file.path("R", "02_descriptives.R"),
-        file.path("R", "03_group_comparisons.R"),
-        file.path("R", "04_posthoc.R"),
-        "README.md",
-        "MDA_analysis.Rproj"
-      )
 
       old_wd <- setwd(tmp_root)
       on.exit({
@@ -254,6 +353,8 @@ exportServer <- function(id, processing_module) {
     stats_group_comparisons_script_path <- "R/templates/stats_group_comparisons.R"
     stats_posthoc_script_path           <- "R/templates/stats_posthoc.R"
     stats_readme_path                   <- "R/templates/README_stats_rproject.md"
+    stats_factorial_template_path       <- "R/templates/stats_factorial_template.R"
+    stats_mixed_template_path           <- "R/templates/stats_mixed_template.R"
 
     # ---- Download: Tagging R project ----
     output$download_rcode_tagging <- downloadHandler(
@@ -327,14 +428,19 @@ exportServer <- function(id, processing_module) {
         paste0("mda_stats_analysis_", format(Sys.Date(), "%Y%m%d"), ".zip")
       },
       content = function(file) {
-        req(results_data())
+        req(results_data_for_stats())
         validate(
-          need(any(c("Dimension1","Dimension2","Dimension3","Dimension4","Dimension5") %in% names(results_data())),
+          need(any(c("Dimension1","Dimension2","Dimension3","Dimension4","Dimension5") %in% names(results_data_for_stats())),
                "Dimension scores not available. Please reprocess your data.")
         )
         withProgress(message = "Building statistical analysis R project...", value = 0, {
           incProgress(0.5)
-          build_stats_rproject_zip(results_data(), zip_dest = file)
+          build_stats_rproject_zip(
+            results_data_for_stats(),
+            zip_dest           = file,
+            factorial_factors  = input$factorial_factors,
+            mixed_grouping_var = input$mixed_grouping_var
+          )
           incProgress(1)
         })
       },

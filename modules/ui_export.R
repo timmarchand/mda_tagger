@@ -266,6 +266,15 @@ exportUI <- function(id) {
           tags$strong("one-way ANOVA, Tukey post-hoc tests, diagnostics, and effect sizes"),
           ". Includes a README documenting how to extend to factorial or mixed-effects designs
            if you add more metadata columns."),
+        hr(),
+        h5("Optional: add more metadata for factorial or mixed-effects designs"),
+        p(class = "text-muted", style = "font-size: 12px;",
+          "Upload a CSV with a doc_id column plus any additional grouping variables
+           (e.g. proficiency, task, author_id). These will be joined to your dimension
+           scores and used to generate additional analysis scripts below."),
+
+        fileInput(ns("extra_metadata_csv"), "Additional metadata CSV (optional):", accept = ".csv"),
+        uiOutput(ns("factor_selectors")),
 
         downloadButton(
           ns("download_stats_project"),

@@ -20,8 +20,9 @@ scores$metadata <- as.factor(scores$metadata)
 glimpse(scores)
 
 # metadata is the grouping/subcorpus column produced by MDA Tagger.
-# If you have additional grouping variables (e.g. proficiency, task, cohort),
-# add them here by joining a metadata table on doc_id, e.g.:
+# If you uploaded additional metadata when exporting (e.g. proficiency, task,
+# author_id), those columns are already included below - no extra join needed.
+# To add further variables later, join them the same way:
 #
 # extra_meta <- read_csv("data/my_extra_metadata.csv", show_col_types = FALSE)
 # scores <- scores %>% left_join(extra_meta, by = "doc_id")
