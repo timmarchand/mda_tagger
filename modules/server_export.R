@@ -72,6 +72,7 @@ exportServer <- function(id, processing_module) {
       !is.null(results_data())
     })
     outputOptions(output, "data_ready", suspendWhenHidden = FALSE)
+
     # ---- Download Tagged ZIP ----
     output$download_tagged_zip <- downloadHandler(
       filename = function() {
@@ -101,6 +102,7 @@ exportServer <- function(id, processing_module) {
       },
       contentType = "application/zip"
     )
+
     # ---- Download Pre-tagged CSV (matches import template) ----
     output$download_pretagged_csv <- downloadHandler(
       filename = function() {
@@ -133,22 +135,22 @@ exportServer <- function(id, processing_module) {
         paste0("mda_tables_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
       },
       content = function(file) {
-  req(results_data(), input$tables_to_export)
+        req(results_data(), input$tables_to_export)
 
-  sheets <- list()
+        sheets <- list()
 
-  if ("full" %in% input$tables_to_export) {
-    sheets[["Full Results"]] <- results_data()
-  }
-  if ("aggregated" %in% input$tables_to_export) {
-    sheets[["Aggregated"]] <- aggregate_by_metadata(results_data())
-  }
-  if ("summary" %in% input$tables_to_export) {
-    sheets[["Summary Statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
-  }
+        if ("full" %in% input$tables_to_export) {
+          sheets[["Full Results"]] <- results_data()
+        }
+        if ("aggregated" %in% input$tables_to_export) {
+          sheets[["Aggregated"]] <- aggregate_by_metadata(results_data())
+        }
+        if ("summary" %in% input$tables_to_export) {
+          sheets[["Summary Statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
+        }
 
-  writexl::write_xlsx(sheets, path = file)
-}
+        writexl::write_xlsx(sheets, path = file)
+      }
     )
 
     # ---- Download Plot ----
@@ -176,6 +178,16 @@ exportServer <- function(id, processing_module) {
         )
       }
     )
+
+    # ---- Helper: fill a template file's {{PLACEHOLDER}} tokens ----
+    fill_template <- function(template_path, replacements) {
+      txt <- readLines(template_path, warn = FALSE)
+      txt <- paste(txt, collapse = "\n")
+      for (key in names(replacements)) {
+        txt <- gsub(paste0("\\{\\{", key, "\\}\\}"), replacements[[key]], txt)
+      }
+      txt
+    }
 
     # ---- Helper: build and zip an R project folder ----
     build_rproject_zip <- function(results_data, script_name, script_path,
@@ -237,16 +249,6 @@ exportServer <- function(id, processing_module) {
       zip::zip(zipfile = zip_dest, files = all_files, mode = "mirror")
       zip_dest
     }  # closes build_rproject_zip
-
-        # ---- Helper: fill a template file's {{PLACEHOLDER}} tokens ----
-    fill_template <- function(template_path, replacements) {
-      txt <- readLines(template_path, warn = FALSE)
-      txt <- paste(txt, collapse = "\n")
-      for (key in names(replacements)) {
-        txt <- gsub(paste0("\\{\\{", key, "\\}\\}"), replacements[[key]], txt)
-      }
-      txt
-    }
 
     # ---- Helper: build and zip the Statistical Analysis project ----
     build_stats_rproject_zip <- function(processed_data, zip_dest,
@@ -343,11 +345,128 @@ exportServer <- function(id, processing_module) {
       zip_dest
     }
 
+    # ---- Helper: build long-format feature count tables plus doc lengths ----
+    build_keyness_tables <- function(processed_data, feature_types, ngram_size = 1) {
+      has_meta <- "metadata" %in% names(processed_data)
+
+      make_ngrams <- function(x, n) {
+        if (length(x) < n) return(character(0))
+        if (n == 1) return(x)
+        cols <- lapply(0:(n - 1), function(k) x[(1 + k):(length(x) - n + 1 + k)])
+        do.call(paste, c(cols, list(sep = " ")))
+      }
+
+      parsed_docs <- lapply(processed_data$tagged_text, function(tt) {
+        tokens <- str_split(tt, "\\s+")[[1]]
+        tokens <- tokens[tokens != ""]
+        if (length(tokens) == 0) {
+          return(list(word = character(0), pos = character(0), tag = character(0), n_words = 0))
+        }
+        has_us    <- str_detect(tokens, "_")
+        word      <- tolower(ifelse(has_us, str_extract(tokens, "^.+?(?=_)"), tokens))
+        full_tag  <- ifelse(has_us, str_extract(tokens, "(?<=_).+$"), "UNTAGGED")
+        base_pos  <- ifelse(full_tag == "UNTAGGED", "UNTAGGED", str_extract(full_tag, "^[^<]+"))
+        list(word = word, pos = base_pos, tag = full_tag, n_words = length(tokens))
+      })
+
+      doc_lengths <- tibble(
+        doc_id   = processed_data$doc_id,
+        metadata = if (has_meta) processed_data$metadata else "unknown",
+        n_words  = map_int(parsed_docs, ~ .x$n_words)
+      )
+
+      level_field <- c(token = "word", pos = "pos", tag = "tag")
+      counts <- list()
+
+      for (ft in feature_types) {
+        field <- level_field[[ft]]
+        counts[[ft]] <- map_dfr(seq_along(parsed_docs), function(i) {
+          units <- parsed_docs[[i]][[field]]
+          feats <- make_ngrams(units, ngram_size)
+          if (length(feats) == 0) return(tibble())
+          tibble(feature = feats) %>%
+            count(feature, name = "count") %>%
+            mutate(
+              doc_id   = processed_data$doc_id[i],
+              metadata = if (has_meta) processed_data$metadata[i] else "unknown"
+            ) %>%
+            select(doc_id, metadata, feature, count)
+        })
+      }
+
+      list(counts = counts, doc_lengths = doc_lengths)
+    }
+
+    # ---- Helper: build and zip the Keyness Analysis project ----
+    build_keyness_rproject_zip <- function(processed_data, feature_types, ngram_size, zip_dest) {
+
+      tmp_root <- file.path(tempdir(), paste0("mda_keyness_", Sys.getpid()))
+      data_dir <- file.path(tmp_root, "data")
+      r_dir    <- file.path(tmp_root, "R")
+      dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+      dir.create(r_dir,    recursive = TRUE, showWarnings = FALSE)
+
+      tables <- build_keyness_tables(processed_data, feature_types, ngram_size)
+
+      readr::write_csv(tables$doc_lengths, file.path(data_dir, "doc_lengths.csv"))
+      all_files <- c(file.path("data", "doc_lengths.csv"))
+
+      filenames <- c(token = "token_counts.csv", pos = "pos_counts.csv", tag = "tag_counts.csv")
+      for (ft in feature_types) {
+        readr::write_csv(tables$counts[[ft]], file.path(data_dir, filenames[[ft]]))
+        all_files <- c(all_files, file.path("data", filenames[[ft]]))
+      }
+
+      file.copy(keyness_kfa_script_path, file.path(r_dir, "02_kfa.R"))
+      file.copy(keyness_dispersion_script_path, file.path(r_dir, "03_dispersion.R"))
+      file.copy(keyness_wlo_script_path, file.path(r_dir, "04_weighted_log_odds.R"))
+      file.copy(keyness_kld_script_path, file.path(r_dir, "05_kld.R"))
+
+      import_txt <- fill_template(keyness_import_script_path, list(NGRAM_SIZE = ngram_size))
+      writeLines(import_txt, file.path(r_dir, "01_import.R"))
+
+      type_labels <- c(token = "Token (word forms)", pos = "POS tag only", tag = "Full tag (POS + MDA subtags)")
+      readme_txt <- fill_template(keyness_readme_path, list(
+        NGRAM_SIZE     = ngram_size,
+        FEATURE_TYPES  = paste(type_labels[feature_types], collapse = ", ")
+      ))
+      writeLines(readme_txt, file.path(tmp_root, "README.md"))
+
+      all_files <- c(all_files,
+                     file.path("R", "01_import.R"),
+                     file.path("R", "02_kfa.R"),
+                     file.path("R", "03_dispersion.R"),
+                     file.path("R", "04_weighted_log_odds.R"),
+                     file.path("R", "05_kld.R"),
+                     "README.md", "MDA_keyness.Rproj")
+
+      writeLines(paste0(
+        "Version: 1.0\n\n",
+        "RestoreWorkspace: No\n",
+        "SaveWorkspace: No\n",
+        "AlwaysSaveHistory: No\n\n",
+        "EnableCodeIndexing: Yes\n",
+        "UseSpacesForTab: Yes\n",
+        "NumSpacesForTab: 2\n",
+        "Encoding: UTF-8\n"
+      ), file.path(tmp_root, "MDA_keyness.Rproj"))
+
+      old_wd <- setwd(tmp_root)
+      on.exit({
+        setwd(old_wd)
+        unlink(tmp_root, recursive = TRUE)
+      }, add = TRUE)
+
+      zip::zip(zipfile = zip_dest, files = all_files, mode = "mirror")
+      zip_dest
+    }
+
     # ---- Paths to script templates ----
     tagging_script_path  <- "R/templates/tagging.R"
     plotting_script_path <- "R/templates/plotting.R"
     kwic_script_path     <- "R/templates/kwic.R"
     readme_path          <- "R/templates/README_rproject.md"
+
     stats_import_script_path            <- "R/templates/stats_import.R"
     stats_descriptives_script_path      <- "R/templates/stats_descriptives.R"
     stats_group_comparisons_script_path <- "R/templates/stats_group_comparisons.R"
@@ -355,6 +474,13 @@ exportServer <- function(id, processing_module) {
     stats_readme_path                   <- "R/templates/README_stats_rproject.md"
     stats_factorial_template_path       <- "R/templates/stats_factorial_template.R"
     stats_mixed_template_path           <- "R/templates/stats_mixed_template.R"
+
+    keyness_import_script_path        <- "R/templates/keyness_import.R"
+    keyness_kfa_script_path           <- "R/templates/keyness_kfa.R"
+    keyness_dispersion_script_path    <- "R/templates/keyness_dispersion.R"
+    keyness_wlo_script_path           <- "R/templates/keyness_weighted_log_odds.R"
+    keyness_kld_script_path           <- "R/templates/keyness_kld.R"
+    keyness_readme_path               <- "R/templates/README_keyness_rproject.md"
 
     # ---- Download: Tagging R project ----
     output$download_rcode_tagging <- downloadHandler(
@@ -447,5 +573,33 @@ exportServer <- function(id, processing_module) {
       contentType = "application/zip"
     )
 
+    # ---- Download: Keyness Analysis data project ----
+    output$download_keyness_project <- downloadHandler(
+      filename = function() {
+        paste0("mda_keyness_", format(Sys.Date(), "%Y%m%d"), ".zip")
+      },
+      content = function(file) {
+        req(results_data())
+        validate(
+          need("tagged_text" %in% names(results_data()),
+               "Tagged text not available. Please reprocess your data.")
+        )
+        validate(
+          need(length(input$keyness_feature_types) > 0,
+               "Select at least one feature type.")
+        )
+        withProgress(message = "Building keyness analysis data...", value = 0, {
+          incProgress(0.5)
+          build_keyness_rproject_zip(
+            results_data(),
+            feature_types = input$keyness_feature_types,
+            ngram_size    = as.integer(input$keyness_ngram_size),
+            zip_dest      = file
+          )
+          incProgress(1)
+        })
+      },
+      contentType = "application/zip"
+    )
   })  # closes moduleServer
 }     # closes exportServer

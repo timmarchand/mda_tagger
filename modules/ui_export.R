@@ -288,6 +288,46 @@ exportUI <- function(id) {
           "ZIP contains dimension_scores.csv, four R scripts (import, descriptives, group
            comparisons, post-hoc), and a README explaining the analysis choices.")
       )
+    ),
+    # Row 5: Keyness / Key Feature Analysis Export
+    fluidRow(
+      box(
+        title       = "🔑 Keyness / Key Feature Analysis Export",
+        width       = 12,
+        status      = "warning",
+        solidHeader = TRUE,
+
+        p("Download data for comparing metadata categories on individual features (words or tags),
+           for use with Key Feature Analysis, weighted log-odds, KL divergence, and dispersion measures."),
+
+        checkboxGroupInput(
+          ns("keyness_feature_types"),
+          "Feature type(s) to export:",
+          choices  = c("Token (word forms)" = "token",
+                       "POS tag only" = "pos",
+                       "Full tag (POS + MDA subtags)" = "tag"),
+          selected = "tag"
+        ),
+
+        selectInput(
+          ns("keyness_ngram_size"),
+          "N-gram size:",
+          choices  = c("1 (single feature)" = 1, "2 (bigram)" = 2, "3 (trigram)" = 3, "4" = 4),
+          selected = 1
+        ),
+
+        downloadButton(
+          ns("download_keyness_project"),
+          "Download Keyness Data Project",
+          class = "btn-warning btn-block"
+        ),
+
+        br(), br(),
+
+        p(class = "text-muted",
+          "ZIP contains doc_lengths.csv plus token/tag count tables, and R scripts for
+           Key Feature Analysis, Gries's dispersion (DP), weighted log-odds, and KL divergence.")
+      )
     )
   )  # end tagList
 }    # end function
