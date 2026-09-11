@@ -22,7 +22,7 @@ exportUI <- function(id) {
       )
     ),
 
-    # Row 1: Tagged texts + Results tables
+    # Row 1: Tagged texts + Results tables ----
     fluidRow(
 
       box(
@@ -115,7 +115,7 @@ exportUI <- function(id) {
       )
     ),
 
-    # Row 2: Plots
+    # Row 2: Plots ----
     fluidRow(
 
       box(
@@ -184,7 +184,7 @@ exportUI <- function(id) {
       )
     ),
 
-    # Row 3: R Code Export
+    # Row 3: R Code Export ----
     fluidRow(
 
       box(
@@ -253,7 +253,32 @@ exportUI <- function(id) {
           " file. Open the project in RStudio and run the script section by section."
         )
       )
-    )
+    ),
+    # Row 4: Statistical Analysis Export ----
+    fluidRow(
+      box(
+        title       = "📈 Statistical Analysis Export",
+        width       = 12,
+        status      = "success",
+        solidHeader = TRUE,
 
+        p("Download a ready-to-run R project for comparing dimension scores across your metadata categories: ",
+          tags$strong("one-way ANOVA, Tukey post-hoc tests, diagnostics, and effect sizes"),
+          ". Includes a README documenting how to extend to factorial or mixed-effects designs
+           if you add more metadata columns."),
+
+        downloadButton(
+          ns("download_stats_project"),
+          "Download Statistical Analysis Project",
+          class = "btn-success btn-block"
+        ),
+
+        br(), br(),
+
+        p(class = "text-muted",
+          "ZIP contains dimension_scores.csv, four R scripts (import, descriptives, group
+           comparisons, post-hoc), and a README explaining the analysis choices.")
+      )
+    )
   )  # end tagList
 }    # end function

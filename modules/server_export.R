@@ -190,11 +190,70 @@ exportServer <- function(id, processing_module) {
       zip_dest
     }  # closes build_rproject_zip
 
+    # ---- Helper: build and zip the Statistical Analysis project ----
+    build_stats_rproject_zip <- function(processed_data, zip_dest) {
+
+      tmp_root <- file.path(tempdir(), paste0("mda_stats_", Sys.getpid()))
+      data_dir <- file.path(tmp_root, "data")
+      r_dir    <- file.path(tmp_root, "R")
+      dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+      dir.create(r_dir,    recursive = TRUE, showWarnings = FALSE)
+
+      dim_cols <- intersect(
+        c("Dimension1", "Dimension2", "Dimension3", "Dimension4", "Dimension5"),
+        names(processed_data)
+      )
+      scores <- processed_data %>%
+        select(doc_id, any_of("metadata"), any_of("n_words"), all_of(dim_cols))
+      readr::write_csv(scores, file.path(data_dir, "dimension_scores.csv"))
+
+      file.copy(stats_import_script_path,            file.path(r_dir, "01_import.R"))
+      file.copy(stats_descriptives_script_path,       file.path(r_dir, "02_descriptives.R"))
+      file.copy(stats_group_comparisons_script_path,  file.path(r_dir, "03_group_comparisons.R"))
+      file.copy(stats_posthoc_script_path,            file.path(r_dir, "04_posthoc.R"))
+      file.copy(stats_readme_path,                    file.path(tmp_root, "README.md"))
+
+      writeLines(paste0(
+        "Version: 1.0\n\n",
+        "RestoreWorkspace: No\n",
+        "SaveWorkspace: No\n",
+        "AlwaysSaveHistory: No\n\n",
+        "EnableCodeIndexing: Yes\n",
+        "UseSpacesForTab: Yes\n",
+        "NumSpacesForTab: 2\n",
+        "Encoding: UTF-8\n"
+      ), file.path(tmp_root, "MDA_analysis.Rproj"))
+
+      all_files <- c(
+        file.path("data", "dimension_scores.csv"),
+        file.path("R", "01_import.R"),
+        file.path("R", "02_descriptives.R"),
+        file.path("R", "03_group_comparisons.R"),
+        file.path("R", "04_posthoc.R"),
+        "README.md",
+        "MDA_analysis.Rproj"
+      )
+
+      old_wd <- setwd(tmp_root)
+      on.exit({
+        setwd(old_wd)
+        unlink(tmp_root, recursive = TRUE)
+      }, add = TRUE)
+
+      zip::zip(zipfile = zip_dest, files = all_files, mode = "mirror")
+      zip_dest
+    }
+
     # ---- Paths to script templates ----
     tagging_script_path  <- "R/templates/tagging.R"
     plotting_script_path <- "R/templates/plotting.R"
     kwic_script_path     <- "R/templates/kwic.R"
     readme_path          <- "R/templates/README_rproject.md"
+    stats_import_script_path            <- "R/templates/stats_import.R"
+    stats_descriptives_script_path      <- "R/templates/stats_descriptives.R"
+    stats_group_comparisons_script_path <- "R/templates/stats_group_comparisons.R"
+    stats_posthoc_script_path           <- "R/templates/stats_posthoc.R"
+    stats_readme_path                   <- "R/templates/README_stats_rproject.md"
 
     # ---- Download: Tagging R project ----
     output$download_rcode_tagging <- downloadHandler(
@@ -256,6 +315,26 @@ exportServer <- function(id, processing_module) {
             readme_path  = readme_path,
             zip_dest     = file
           )
+          incProgress(1)
+        })
+      },
+      contentType = "application/zip"
+    )
+
+    # ---- Download: Statistical Analysis R project ----
+    output$download_stats_project <- downloadHandler(
+      filename = function() {
+        paste0("mda_stats_analysis_", format(Sys.Date(), "%Y%m%d"), ".zip")
+      },
+      content = function(file) {
+        req(results_data())
+        validate(
+          need(any(c("Dimension1","Dimension2","Dimension3","Dimension4","Dimension5") %in% names(results_data())),
+               "Dimension scores not available. Please reprocess your data.")
+        )
+        withProgress(message = "Building statistical analysis R project...", value = 0, {
+          incProgress(0.5)
+          build_stats_rproject_zip(results_data(), zip_dest = file)
           incProgress(1)
         })
       },
