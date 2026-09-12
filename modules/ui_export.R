@@ -22,6 +22,25 @@ exportUI <- function(id) {
       )
     ),
 
+    # Shared: optional metadata upload, used by Statistical Analysis,
+    # Regression Modelling (and, if selected, Keyness) exports below
+    fluidRow(
+      box(
+        title       = "\U0001F4CE Optional: Additional Metadata for Downloads",
+        width       = 12,
+        status      = "info",
+        solidHeader = TRUE,
+        collapsible = TRUE,
+
+        p("Upload a CSV with a doc_id column plus any additional variables (e.g.
+           proficiency, task, author_id). These are joined to your data by doc_id and
+           made available as predictors in the Statistical Analysis and Regression
+           Modelling downloads below."),
+
+        fileInput(ns("extra_metadata_csv"), "Additional metadata CSV (optional):", accept = ".csv")
+      )
+    ),
+
     # Row 1: Tagged texts + Results tables ----
     fluidRow(
 
@@ -267,14 +286,13 @@ exportUI <- function(id) {
           ". Includes a README documenting how to extend to factorial or mixed-effects designs
            if you add more metadata columns."),
         hr(),
-        h5("Optional: add more metadata for factorial or mixed-effects designs"),
+        h5("Factorial / mixed-effects designs"),
         p(class = "text-muted", style = "font-size: 12px;",
-          "Upload a CSV with a doc_id column plus any additional grouping variables
-           (e.g. proficiency, task, author_id). These will be joined to your dimension
-           scores and used to generate additional analysis scripts below."),
+          "If you uploaded a metadata CSV above, choose factors below to generate
+           additional analysis scripts."),
 
-        fileInput(ns("extra_metadata_csv"), "Additional metadata CSV (optional):", accept = ".csv"),
         uiOutput(ns("factor_selectors")),
+
 
         downloadButton(
           ns("download_stats_project"),
@@ -289,7 +307,7 @@ exportUI <- function(id) {
            comparisons, post-hoc), and a README explaining the analysis choices.")
       )
     ),
-    # Row 5: Keyness / Key Feature Analysis Export
+    # Row 5: Keyness / Key Feature Analysis Export ----
     fluidRow(
       box(
         title       = "🔑 Keyness / Key Feature Analysis Export",
@@ -327,6 +345,51 @@ exportUI <- function(id) {
         p(class = "text-muted",
           "ZIP contains doc_lengths.csv plus token/tag count tables, and R scripts for
            Key Feature Analysis, Gries's dispersion (DP), weighted log-odds, and KL divergence.")
+      )
+    ),
+    # Row 6: Regression Modelling Export ----
+    fluidRow(
+      box(
+        title       = "\U0001F4C9 Regression Modelling Export",
+        width       = 12,
+        status      = "danger",
+        solidHeader = TRUE,
+
+        p("Download feature count data and R scripts for modelling how the frequency of a
+           single chosen feature varies with predictor variables (PPML, GLMM, and
+           zero-inflated Poisson)."),
+
+        p(class = "text-muted", style = "font-size: 12px;",
+          "Uses the metadata CSV uploaded above, if any, so its columns are available as
+           predictors alongside metadata."),
+
+        checkboxGroupInput(
+          ns("regression_feature_types"),
+          "Feature type(s) to export:",
+          choices  = c("Token (word forms)" = "token",
+                       "POS tag only" = "pos",
+                       "Full tag (POS + MDA subtags)" = "tag"),
+          selected = "tag"
+        ),
+
+        selectInput(
+          ns("regression_ngram_size"),
+          "N-gram size:",
+          choices  = c("1 (single feature)" = 1, "2 (bigram)" = 2, "3 (trigram)" = 3, "4" = 4),
+          selected = 1
+        ),
+
+        downloadButton(
+          ns("download_regression_project"),
+          "Download Regression Modelling Project",
+          class = "btn-danger btn-block"
+        ),
+
+        br(), br(),
+
+        p(class = "text-muted",
+          "ZIP contains doc_lengths.csv (with any uploaded predictor columns joined in),
+           the relevant count table(s), and PPML/GLMM/ZIP model scripts.")
       )
     )
   )  # end tagList

@@ -470,6 +470,76 @@ exportServer <- function(id, processing_module) {
       zip_dest
     }
 
+    # ---- Helper: build and zip the Regression Modelling project ----
+    build_regression_rproject_zip <- function(processed_data, feature_types, ngram_size,
+                                              extra_meta_df, zip_dest) {
+
+      tmp_root <- file.path(tempdir(), paste0("mda_regression_", Sys.getpid()))
+      data_dir <- file.path(tmp_root, "data")
+      r_dir    <- file.path(tmp_root, "R")
+      dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+      dir.create(r_dir,    recursive = TRUE, showWarnings = FALSE)
+
+      tables <- build_keyness_tables(processed_data, feature_types, ngram_size)
+      doc_lengths <- tables$doc_lengths
+
+      if (!is.null(extra_meta_df)) {
+        doc_lengths$doc_id <- as.character(doc_lengths$doc_id)
+        extra_meta_df$doc_id <- as.character(extra_meta_df$doc_id)
+        doc_lengths <- dplyr::left_join(doc_lengths, extra_meta_df, by = "doc_id")
+      }
+
+      readr::write_csv(doc_lengths, file.path(data_dir, "doc_lengths.csv"))
+      all_files <- c(file.path("data", "doc_lengths.csv"))
+
+      filenames <- c(token = "token_counts.csv", pos = "pos_counts.csv", tag = "tag_counts.csv")
+      for (ft in feature_types) {
+        readr::write_csv(tables$counts[[ft]], file.path(data_dir, filenames[[ft]]))
+        all_files <- c(all_files, file.path("data", filenames[[ft]]))
+      }
+
+      import_txt <- fill_template(regression_import_script_path, list(NGRAM_SIZE = ngram_size))
+      writeLines(import_txt, file.path(r_dir, "01_import.R"))
+
+      file.copy(regression_ppml_script_path, file.path(r_dir, "02_ppml.R"))
+      file.copy(regression_glmm_script_path, file.path(r_dir, "03_glmm.R"))
+      file.copy(regression_zip_script_path,  file.path(r_dir, "04_zip.R"))
+
+      type_labels <- c(token = "Token (word forms)", pos = "POS tag only", tag = "Full tag (POS + MDA subtags)")
+      readme_txt <- fill_template(regression_readme_path, list(
+        NGRAM_SIZE    = ngram_size,
+        FEATURE_TYPES = paste(type_labels[feature_types], collapse = ", ")
+      ))
+      writeLines(readme_txt, file.path(tmp_root, "README.md"))
+
+      all_files <- c(all_files,
+                     file.path("R", "01_import.R"),
+                     file.path("R", "02_ppml.R"),
+                     file.path("R", "03_glmm.R"),
+                     file.path("R", "04_zip.R"),
+                     "README.md", "MDA_regression.Rproj")
+
+      writeLines(paste0(
+        "Version: 1.0\n\n",
+        "RestoreWorkspace: No\n",
+        "SaveWorkspace: No\n",
+        "AlwaysSaveHistory: No\n\n",
+        "EnableCodeIndexing: Yes\n",
+        "UseSpacesForTab: Yes\n",
+        "NumSpacesForTab: 2\n",
+        "Encoding: UTF-8\n"
+      ), file.path(tmp_root, "MDA_regression.Rproj"))
+
+      old_wd <- setwd(tmp_root)
+      on.exit({
+        setwd(old_wd)
+        unlink(tmp_root, recursive = TRUE)
+      }, add = TRUE)
+
+      zip::zip(zipfile = zip_dest, files = all_files, mode = "mirror")
+      zip_dest
+    }
+
     # ---- Paths to script templates ----
     tagging_script_path  <- "R/templates/tagging.R"
     plotting_script_path <- "R/templates/plotting.R"
@@ -490,6 +560,12 @@ exportServer <- function(id, processing_module) {
     keyness_wlo_script_path           <- "R/templates/keyness_weighted_log_odds.R"
     keyness_kld_script_path           <- "R/templates/keyness_kld.R"
     keyness_readme_path               <- "R/templates/README_keyness_rproject.md"
+
+    regression_import_script_path <- "R/templates/regression_import.R"
+    regression_ppml_script_path   <- "R/templates/regression_ppml.R"
+    regression_glmm_script_path   <- "R/templates/regression_glmm.R"
+    regression_zip_script_path    <- "R/templates/regression_zip.R"
+    regression_readme_path        <- "R/templates/README_regression_rproject.md"
 
     # ---- Download: Tagging R project ----
     output$download_rcode_tagging <- downloadHandler(
@@ -603,6 +679,39 @@ exportServer <- function(id, processing_module) {
             results_data(),
             feature_types = input$keyness_feature_types,
             ngram_size    = as.integer(input$keyness_ngram_size),
+            zip_dest      = file
+          )
+          incProgress(1)
+        })
+      },
+      contentType = "application/zip"
+    )
+
+    # ---- Download: Regression Modelling data project ----
+    output$download_regression_project <- downloadHandler(
+      filename = function() {
+        paste0("mda_regression_", format(Sys.Date(), "%Y%m%d"), ".zip")
+      },
+      content = function(file) {
+        req(results_data())
+        validate(
+          need("tagged_text" %in% names(results_data()),
+               "Tagged text not available. Please reprocess your data.")
+        )
+        validate(
+          need(length(input$regression_feature_types) > 0,
+               "Select at least one feature type.")
+        )
+
+        extra_meta_df <- tryCatch(extra_metadata(), error = function(e) NULL)
+
+        withProgress(message = "Building regression modelling data...", value = 0, {
+          incProgress(0.5)
+          build_regression_rproject_zip(
+            results_data(),
+            feature_types = input$regression_feature_types,
+            ngram_size    = as.integer(input$regression_ngram_size),
+            extra_meta_df = extra_meta_df,
             zip_dest      = file
           )
           incProgress(1)
