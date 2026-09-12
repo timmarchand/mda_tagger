@@ -12,11 +12,17 @@
 # replaced entirely with a single space, since deleting it outright would
 # glue the surrounding words together into a new run-on.
 issue_defs <- list(
+  list(id = "html_residue", short = "HTML", kind = "span",
+       label = "HTML residue (tags/entities) - e.g. <br/>, &nbsp; - replaced with a single space",
+       pattern = "</?[a-zA-Z][a-zA-Z0-9]*\\s*/?>|&[a-zA-Z#][a-zA-Z0-9]*;"),
   list(id = "period_upper", short = "Period+Cap", kind = "adjacency",
        label = "Period + capital letter, no space (default) - e.g. \"on.Should\"",
        pattern = "[a-z]\\.[A-Z]"),
-  list(id = "period_lower", short = "Period+low", kind = "adjacency",
-       label = "Period + lowercase letter, no space - e.g. \"on.should\"",
+  list(id = "period_lower", short = "Per+low", kind = "adjacency", subtype = "exclude_common",
+       label = "Period + lowercase letter, no space, excluding common abbreviations/URLs - e.g. \"on.should\"",
+       pattern = "[a-z]\\.[a-z]"),
+  list(id = "period_lower_common", short = "Per+low (common)", kind = "adjacency", subtype = "common_only",
+       label = "Period + lowercase - common abbreviations/URLs only, for separate review - e.g. \"a.m.\", \"google.com\"",
        pattern = "[a-z]\\.[a-z]"),
   list(id = "comma_word", short = "Comma", kind = "adjacency",
        label = "Comma + letter, no space - e.g. \"cats,dogs\"",
@@ -26,13 +32,10 @@ issue_defs <- list(
        pattern = "[a-zA-Z][?!][A-Za-z]"),
   list(id = "semicolon_colon", short = ";/:", kind = "adjacency",
        label = "Semicolon or colon + letter, no space - e.g. \"first;second\"",
-       pattern = "[a-zA-Z][;:][A-Za-z]"),
-  list(id = "html_residue", short = "HTML", kind = "span",
-       label = "HTML residue (tags/entities) - e.g. <br/>, &nbsp; - replaced with a single space",
-       pattern = "</?[a-zA-Z][a-zA-Z0-9]*\\s*/?>|&[a-zA-Z#][a-zA-Z0-9]*;")
+       pattern = "[a-zA-Z][;:][A-Za-z]")
 )
 
-DEFAULT_ISSUE_TYPES <- "period_upper"
+DEFAULT_ISSUE_TYPES <- c("html_residue", "period_upper")
 
 # Named vector for checkboxGroupInput: names are the long labels shown to
 # the user, values are the ids used internally.
@@ -40,6 +43,52 @@ issue_type_choices <- setNames(
   vapply(issue_defs, function(d) d$id, character(1)),
   vapply(issue_defs, function(d) d$label, character(1))
 )
+
+# ---- Common abbreviations and domain suffixes treated as "safe" period +
+#      lowercase adjacencies (e.g. "e.g.", "8a.m.", "xxx@site.com",
+#      "www.site.com"), scanned separately via period_lower_common above
+#      rather than mixed in with genuine run-on candidates. ----
+common_period_tlds <- c("com", "org", "net", "edu", "gov", "co", "io", "jp", "uk",
+                        "de", "fr", "cn", "info", "biz", "us", "ca", "au")
+
+# Matches a.m / p.m / e.g / i.e as a bounded unit, regardless of what
+# digits, colons, or punctuation are glued directly onto them (e.g. "8a.m",
+# "11:30a.m.", ".i.e."). The lookaround requires the letter on each side
+# NOT be part of a longer lowercase word, so "via.middle" is correctly left
+# as a genuine run-on rather than misread as containing "i.e" or similar.
+abbrev_regex <- "(?<![a-z])(a\\.m|p\\.m|e\\.g|i\\.e)(?![a-z])"
+
+is_common_period_context <- function(full_text, match_pos) {
+  n <- nchar(full_text)
+
+  # ---- Abbreviation check: small local window, case-insensitive ----
+  local_from <- max(1, match_pos - 6)
+  local_to   <- min(n, match_pos + 6)
+  local_window <- tolower(substr(full_text, local_from, local_to))
+  if (grepl(abbrev_regex, local_window, perl = TRUE)) return(TRUE)
+
+  # ---- Email / URL / domain check: whole whitespace-delimited token ----
+  left <- match_pos
+  while (left > 1 && !grepl("\\s", substr(full_text, left - 1, left - 1))) left <- left - 1
+  right <- match_pos
+  while (right < n && !grepl("\\s", substr(full_text, right + 1, right + 1))) right <- right + 1
+  word <- tolower(substr(full_text, left, right))
+
+  # Trim leading/trailing quote marks, parentheses, etc. that aren't part
+  # of the email/URL itself but often sit right next to it in prose.
+  word <- str_replace(word, "^[^a-z0-9]+", "")
+  word <- str_replace(word, "[^a-z0-9]+$", "")
+
+  if (nchar(word) == 0) return(FALSE)
+
+  domain_pattern <- paste0(
+    "^(https?://)?(www\\.)?([a-z0-9_.+-]+@)?[a-z0-9-]+(\\.[a-z0-9-]+)*\\.(",
+    paste(common_period_tlds, collapse = "|"),
+    ")([/:.,;].*)?$"
+  )
+
+  grepl(domain_pattern, word)
+}
 
 #' Tokenization Check Server Module
 #'
@@ -126,6 +175,13 @@ tokenCheckServer <- function(id, data_module, paren_session = NULL) {
               before_pos <- m[j]
               punct_pos  <- before_pos + 1
               after_pos  <- before_pos + 2
+
+              if (!is.null(def$subtype)) {
+                is_common <- is_common_period_context(txt, punct_pos)
+                if (def$subtype == "exclude_common" && is_common) return(tibble())
+                if (def$subtype == "common_only" && !is_common) return(tibble())
+              }
+
               ctx_from   <- max(1, before_pos - 34)
               ctx_to     <- min(nchar(txt), after_pos + 35)
               tibble(

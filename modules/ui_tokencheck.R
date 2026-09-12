@@ -33,6 +33,11 @@ tokenCheckUI <- function(id) {
         ),
 
         p(class = "text-muted", style = "font-size: 11px;",
+          "HTML residue is checked by default and works best fixed first — leftover tags like ",
+          tags$code("<br/>"), " can otherwise mask emails and URLs from the period + lowercase ",
+          "letter check, making them look like unresolved run-ons."),
+
+        p(class = "text-muted", style = "font-size: 11px;",
           "Every row below starts selected. If a match is a false positive you don't want ",
           "changed — e.g. ", tags$code("e.g."), " or ", tags$code("a.m."),
           " under period + lowercase letter — click that row to deselect it, then use ",
