@@ -59,6 +59,10 @@ if (length(mixed_pairwise_rows) > 0) {
   stat_col <- intersect(c("t.ratio", "z.ratio"), names(mixed_pairwise_rows[[1]]))
   mixed_pairwise_table <- dplyr::bind_rows(mixed_pairwise_rows) %>%
     select(dimension, contrast, estimate, SE, df, all_of(stat_col), p.value)
+
+  # check mixed_pairwise_table
+  mixed_pairwise_table
+  # write to csv
   readr::write_csv(mixed_pairwise_table, "output/mixed_pairwise_comparisons.csv")
   cat("\nSaved mixed_pairwise_comparisons.csv to output/\n")
 }

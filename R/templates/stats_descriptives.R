@@ -24,8 +24,11 @@ descriptives <- scores %>%
     .groups = "drop"
   )
 
-print(descriptives)
-write_csv(descriptives, "output/descriptive_statistics.csv")
+# check descriptives
+descriptives
+
+# write to csv
+write_csv(descriptives, "output/descriptive_statistics.csv")write_csv(descriptives, "output/descriptive_statistics.csv")
 
 # ---- Boxplots, one per dimension ----
 for (dim in dimension_cols) {

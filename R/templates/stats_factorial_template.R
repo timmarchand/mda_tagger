@@ -43,7 +43,10 @@ for (dim in dimension_cols) {
 factorial_omnibus_table <- dplyr::bind_rows(factorial_omnibus_rows) %>%
   select(dimension, term, everything())
 
-print(factorial_omnibus_table)
+# check factorial_omnibus_table
+factorial_omnibus_table
+
+# write to csv
 readr::write_csv(factorial_omnibus_table, "output/factorial_omnibus_tests.csv")
 
 factorial_pairwise_rows <- list()
@@ -60,6 +63,10 @@ stat_col <- intersect(c("t.ratio", "z.ratio"), names(factorial_pairwise_rows[[1]
 factorial_pairwise_table <- dplyr::bind_rows(factorial_pairwise_rows) %>%
   select(dimension, contrast, estimate, SE, df, all_of(stat_col), p.value)
 
+# check factorial_pairwise_table
+factorial_pairwise_table
+
+# write to csv
 readr::write_csv(factorial_pairwise_table, "output/factorial_pairwise_comparisons.csv")
 
 cat("\nSaved factorial_omnibus_tests.csv, factorial_pairwise_comparisons.csv,",

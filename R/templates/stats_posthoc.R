@@ -27,6 +27,10 @@ for (dim in names(models)) {
 pairwise_table <- dplyr::bind_rows(pairwise_rows) %>%
   select(dimension, contrast, estimate, SE, df, t.ratio, p.value)
 
+# check pairwise_table
+pairwise_table
+
+# write to csv
 readr::write_csv(pairwise_table, "output/pairwise_comparisons_tukey.csv")
 
 # library(rstatix)

@@ -50,7 +50,11 @@ for (dim in dimension_cols) {
 }
 
 omnibus_table <- dplyr::bind_rows(omnibus_rows)
-print(omnibus_table)
+
+# check omnibus_table
+omnibus_table
+
+# write to csv
 readr::write_csv(omnibus_table, "output/omnibus_tests.csv")
 
 if (requireNamespace("effectsize", quietly = TRUE)) {
@@ -58,8 +62,13 @@ if (requireNamespace("effectsize", quietly = TRUE)) {
     es <- effectsize::eta_squared(models[[dim]])
     tibble::tibble(dimension = dim, eta_squared = round(es$Eta2[1], 3))
   })
+
   eta_table <- dplyr::bind_rows(eta_rows)
-  print(eta_table)
+
+  #check eta_table
+  eta_table
+
+  # write to csv
   readr::write_csv(eta_table, "output/effect_sizes_omnibus.csv")
 } else {
   cat("\n(Install the 'effectsize' package for omnibus eta-squared effect sizes.)\n")
