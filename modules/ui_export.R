@@ -97,7 +97,8 @@ exportUI <- function(id) {
         p(class = "text-muted",
           "CSV with doc_id, tagged_text, metadata columns \u2014 matches the format
            expected by the Pre-tagged Data upload option, so you can re-import
-           this file directly.")
+           this file directly. If you uploaded an additional metadata CSV above,
+           its columns are included too.")
       ),
 
       box(

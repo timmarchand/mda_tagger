@@ -109,20 +109,29 @@ exportServer <- function(id, processing_module) {
         paste0("pretagged_data_", format(Sys.Date(), "%Y%m%d"), ".csv")
       },
       content = function(file) {
-        req(results_data())
+        req(results_data_for_stats())
         validate(
-          need("tagged_text" %in% names(results_data()),
+          need("tagged_text" %in% names(results_data_for_stats()),
                "Tagged text not available. Please reprocess your data.")
         )
 
-        data <- results_data()
+        data <- results_data_for_stats()
         has_meta <- "metadata" %in% names(data)
+
+        core_cols  <- c("doc_id", "tagged_text", "metadata")
+        extra_cols <- setdiff(names(data), c(core_cols, "text", "n_words",
+                                             "Dimension1", "Dimension2", "Dimension3",
+                                             "Dimension4", "Dimension5", "closest_text_type"))
 
         export_df <- tibble(
           doc_id      = data$doc_id,
           tagged_text = data$tagged_text,
           metadata    = if (has_meta) data$metadata else "unknown"
         )
+
+        if (length(extra_cols) > 0) {
+          export_df <- bind_cols(export_df, data[extra_cols])
+        }
 
         readr::write_csv(export_df, file)
       },
