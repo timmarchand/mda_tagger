@@ -357,16 +357,25 @@ exportServer <- function(id, processing_module) {
       }
 
       parsed_docs <- lapply(processed_data$tagged_text, function(tt) {
+        tt <- str_replace_all(tt, "(\\S+)\\s+(<)", "\\1\\2")
         tokens <- str_split(tt, "\\s+")[[1]]
         tokens <- tokens[tokens != ""]
+
         if (length(tokens) == 0) {
           return(list(word = character(0), pos = character(0), tag = character(0), n_words = 0))
         }
+
         has_us    <- str_detect(tokens, "_")
         word      <- tolower(ifelse(has_us, str_extract(tokens, "^.+?(?=_)"), tokens))
         full_tag  <- ifelse(has_us, str_extract(tokens, "(?<=_).+$"), "UNTAGGED")
         base_pos  <- ifelse(full_tag == "UNTAGGED", "UNTAGGED", str_extract(full_tag, "^[^<]+"))
-        list(word = word, pos = base_pos, tag = full_tag, n_words = length(tokens))
+
+        list(
+          word    = word,
+          pos     = paste0("{{", base_pos, "}}"),
+          tag     = paste0("{{", full_tag, "}}"),
+          n_words = length(tokens)
+        )
       })
 
       doc_lengths <- tibble(

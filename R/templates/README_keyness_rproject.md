@@ -21,14 +21,15 @@ N-gram size: {{NGRAM_SIZE}}
 - count - how many times that feature occurs in that document
 
 `data/pos_counts.csv` (if exported) - same structure, but feature is a base
-part-of-speech tag with MDA subtags stripped (e.g. NN, VBD), or an n-gram of
-these.
+part-of-speech tag with MDA subtags stripped, wrapped in double braces to
+match the tag-bundle syntax used elsewhere in MDA Tagger (e.g. {{NN}},
+{{VBD}}), or a space-joined n-gram of these.
 
 `data/tag_counts.csv` (if exported) - same structure, but feature is a full
-tag string including MDA subtags (e.g. NN<NN>, DT<DEMP>), or an n-gram of
-these.
+tag string including MDA subtags, also brace-wrapped (e.g. {{NN<NN>}},
+{{DT<DEMP>}}), or an n-gram of these.
 
-Tokens with no recoverable tag are recorded as UNTAGGED at the pos/tag
+Tokens with no recoverable tag are recorded as {{UNTAGGED}} at the pos/tag
 level, kept separate from the word-form data so they never contaminate
 token-level counts.
 
