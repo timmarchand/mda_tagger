@@ -138,28 +138,48 @@ exportServer <- function(id, processing_module) {
       contentType = "text/csv"
     )
 
-    # ---- Download Tables (Excel) ----
+    # ---- Download Tables (CSV, zipped if more than one selected) ----
     output$download_tables <- downloadHandler(
       filename = function() {
-        paste0("mda_tables_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+        if (length(input$tables_to_export) == 1) {
+          paste0("mda_", input$tables_to_export, "_", format(Sys.Date(), "%Y%m%d"), ".csv")
+        } else {
+          paste0("mda_tables_", format(Sys.Date(), "%Y%m%d"), ".zip")
+        }
       },
       content = function(file) {
         req(results_data(), input$tables_to_export)
 
-        sheets <- list()
+        tables <- list()
 
         if ("full" %in% input$tables_to_export) {
-          sheets[["Full Results"]] <- results_data()
+          tables[["full_results"]] <- results_data()
         }
         if ("aggregated" %in% input$tables_to_export) {
-          sheets[["Aggregated"]] <- aggregate_by_metadata(results_data())
+          tables[["aggregated"]] <- aggregate_by_metadata(results_data())
         }
         if ("summary" %in% input$tables_to_export) {
-          sheets[["Summary Statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
+          tables[["summary_statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
         }
 
-        writexl::write_xlsx(sheets, path = file)
-      }
+        if (length(tables) == 1) {
+          readr::write_csv(tables[[1]], file)
+        } else {
+          tmp_dir <- file.path(tempdir(), paste0("mda_tables_", Sys.getpid()))
+          dir.create(tmp_dir, showWarnings = FALSE)
+          on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+          csv_paths <- character(0)
+          for (nm in names(tables)) {
+            p <- file.path(tmp_dir, paste0(nm, ".csv"))
+            readr::write_csv(tables[[nm]], p)
+            csv_paths <- c(csv_paths, p)
+          }
+
+          zip::zip(zipfile = file, files = csv_paths, mode = "cherry-pick")
+        }
+      },
+      contentType = "application/octet-stream"
     )
 
     # ---- Download Plot ----

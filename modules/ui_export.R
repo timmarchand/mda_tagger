@@ -124,14 +124,14 @@ exportUI <- function(id) {
 
         downloadButton(
           ns("download_tables"),
-          "Download Tables (Excel)",
+          "Download Tables (CSV)",
           class = "btn-success btn-block"
         ),
 
         br(), br(),
 
         p(class = "text-muted",
-          "Excel file will contain multiple sheets with selected tables.")
+          "Downloads a single CSV if one table is selected, or a ZIP of CSVs if more than one.")
       )
     ),
 
