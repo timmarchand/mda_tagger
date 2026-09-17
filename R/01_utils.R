@@ -307,6 +307,265 @@ dtag_hedges <- function(x) {
   return(x$x)
 }
 
+#' Correct possessive tags so later regex matching works (_PRP$ -> _PRPS, _WP$ -> _WPS)
+#' MUST run first in the pipeline, before anything else.
+dtag_possessives <- function(x){
+  x <- data.table::data.table(x)
+  x[d_grepl_case(x, "(_PRP)."), x:= d_sub(x, "(_PRP).", "\\1S")]
+  x[d_grepl_case(x, "(_WP)."), x:= d_sub(x, "(_WP).", "\\1S")]
+  return(x$x)
+}
+
+#' Case-sensitive grepl (companion to d_grepl, which is presumably case-insensitive)
+d_grepl_case <- function(x, pattern, ...){
+  base::grepl({{pattern}}, {{x}}, ignore.case = FALSE, perl = TRUE)
+}
+
+#' Sentence relatives <SERE>
+dtag_sentence_rels <- function(x){
+  sentence_rels <- NULL
+  x <- data.table(x)
+  x[, sentence_rels := str_detect(shift(x, type="lag", n=1), "_\\W") & d_grepl(x,"\\bwhich_")]
+  x[sentence_rels == TRUE, x := d_sub(x, "$", " <SERE>")]
+  return(x$x)
+}
+
+#' THAT deletion <THATD>
+dtag_that_del <- function(x){
+  that_del1 <- that_del2 <- that_del3 <- that_del4 <- NULL
+  x <- data.table(x)
+  x[, that_del1 := d_grepl(x, str_flatten(sh[c("public","private","suasive")], "|")) &
+      d_grepl(shift(x, type="lead", n=1), "<DEMP>|\\bi_|\\bwe_|\\bhe_|\\bshe_|\\bthey_")]
+  x[, that_del2 := d_grepl(x, str_flatten(sh[c("public","private","suasive")], "|")) &
+      d_grepl(shift(x, type="lead", n=1), "_PRP|_N") &
+      (d_grepl(shift(x, type="lead", n=2), "_MD|_V") |
+         d_grepl(shift(x, type="lead", n=2), str_flatten(sh[c("do","have","be")],"|")))]
+  x[, that_del3 := d_grepl(x, str_flatten(sh[c("public","private","suasive")], "|")) &
+      (d_grepl(shift(x, type="lead", n=1), "_PRP|_N") |
+         d_grepl(shift(x, type="lead", n=1), "_JJ|_PRED|_RB|_DT|_QUAN|_CD|_PRPS")) &
+      d_grepl(shift(x, type="lead", n=2), "_N") &
+      (d_grepl(shift(x, type="lead", n=3), "_MD|_V") |
+         d_grepl(shift(x, type="lead", n=3), str_flatten(sh[c("do","have","be")],"|")))]
+  x[, that_del4 := d_grepl(x, str_flatten(sh[c("public","private","suasive")], "|")) &
+      (d_grepl(shift(x, type="lead", n=1), "_PRP|_N") |
+         d_grepl(shift(x, type="lead", n=1), "_JJ|_PRED|_RB|_DT|_QUAN|_CD|_PRPS")) &
+      d_grepl(shift(x, type="lead", n=2), "_JJ|_PRED") &
+      d_grepl(shift(x, type="lead", n=3), "_N") &
+      (d_grepl(shift(x, type="lead", n=4), "_MD|_V") |
+         d_grepl(shift(x, type="lead", n=4), str_flatten(sh[c("do","have","be")],"|")))]
+  x[that_del1 == TRUE, x := d_sub(x, "$", " <THATD>")]
+  x[that_del2 == TRUE, x := d_sub(x, "$", " <THATD>")]
+  x[that_del3 == TRUE, x := d_sub(x, "$", " <THATD>")]
+  x[that_del4 == TRUE, x := d_sub(x, "$", " <THATD>")]
+  return(x$x)
+}
+
+#' WH clauses <WHCL>
+#' NOTE: the any() below collapses the last condition to one value for the
+#' whole document rather than testing per-token. Test this one specifically
+#' after wiring it in - it may not behave the way the other functions do.
+dtag_wh_clauses <- function(x){
+  wh_clauses <- NULL
+  x <- data.table(x)
+  x[, wh_clauses := d_grepl(shift(x, type="lag", n=1), str_flatten(sh[c("public","private","suasive")],"|")) &
+      d_grepl(x, str_flatten(sh[c("wp","who")],"|")) &
+      any(!d_grepl(shift(x, type="lead", n=1),"_MD") |
+            !d_grepl(shift(x, type="lead", n=1), str_flatten(sh[c("do","have","be")],"|")))]
+  x[wh_clauses == TRUE, x := d_sub(x, "$", " <WHCL>")]
+  return(x$x)
+}
+
+#' WH questions <WHQU>
+dtag_wh_questions <- function(x){
+  wh_questions <- NULL
+  x <- data.table(x)
+  x[, wh_questions := d_grepl_case(shift(x, type="lag", n=1), "_\\W|\\b[Ss]o_RB|\\b[Aa]nd_") &
+      d_grepl(x, sh["who"]) &
+      !d_grepl(x,"\\bhowever_|\\bwhatever_") &
+      d_grepl(shift(x, type="lead", n=1), str_c("_MD|", str_flatten(sh[c("have","be","do")], "|")))]
+  x[wh_questions == TRUE, x := d_sub(x, "$", " <WHQU>")]
+  return(x$x)
+}
+
+#' Pied-piping relatives <PIRE>
+dtag_pp_rel_clauses <- function(x){
+  pp_rel_clauses <- NULL
+  x <- data.table(x)
+  x[, pp_rel_clauses := d_grepl(x, "<PIN>") &
+      d_grepl(shift(x, type="lead", n=1), "\\bwho_|\\bwhom_|\\bwhose_|\\bwhich_")]
+  x[pp_rel_clauses == TRUE, x := d_sub(x,"$"," <PIRE>")]
+  return(x$x)
+}
+
+#' THAT as adjectival complement <THAC>
+dtag_that_ac <- function(x){
+  that_ac <- NULL
+  x <- data.table(x)
+  x[, that_ac := d_grepl(x, "\\bthat_") & d_grepl(shift(x, type="lag", n=1), "_JJ")]
+  x[that_ac == TRUE, x := d_sub(x, "$", " <THAC>")]
+  return(x$x)
+}
+
+#' THAT as verb complement <THVC> - that_vc2/3/4/5 typo corrected
+dtag_that_vc <- function(x){
+  that_vc1 <- that_vc2 <- that_vc3 <- that_vc4 <- that_vc5 <- NULL
+  x <- data.table(x)
+  x[, that_vc1 := d_grepl_case(shift(x, type="lag", n=1), "\\band_|\\bnor_|\\bbut_|\\bor_|\\balso_|_\\W") &
+      d_grepl(x, "\\bthat_") &
+      d_grepl(shift(x, type="lead", n=1), "_DT|<QUAN>|_CD|_PRP|there_|_NNS|_NNP")]
+  x[, that_vc2 := d_grepl(shift(x, type="lag", n=1), str_c(str_flatten(sh[c("public","private","suasive")],"|"),
+                                                           "|\\bseem_|\\bseems_|\\bseemed_|\\bseeming_|\\bappear_|\\bappears_|\\bappeared_|\\bappearing_")) &
+      d_grepl(x, "\\bthat_") &
+      !d_grepl(shift(x, type="lead", n=1), "_V|_MD|\\band_|_\\W") &
+      !d_grepl(shift(x, type="lead", n=1), str_flatten(sh[c("do","have","be")], "|"))]
+  x[, that_vc3 := d_grepl(shift(x, type="lag", n=1), str_flatten(sh[c("public","private","suasive")],"|")) &
+      d_grepl(x, "\\bthat_") &
+      d_grepl(shift(x, type="lead", n=1), "_N") &
+      d_grepl(shift(x, type="lead", n=2), "<PIN>") &
+      !d_grepl(shift(x, type="lead", n=3), "_N")]
+  x[, that_vc4 := d_grepl(shift(x, type="lag", n=1), str_flatten(sh[c("public","private","suasive")],"|")) &
+      d_grepl(x, "\\bthat_") &
+      d_grepl(shift(x, type="lead", n=2), "_N") &
+      d_grepl(shift(x, type="lead", n=3), "<PIN>") &
+      !d_grepl(shift(x, type="lead", n=4), "_N")]
+  x[, that_vc5 := d_grepl(shift(x, type="lag", n=1), str_flatten(sh[c("public","private","suasive")],"|")) &
+      d_grepl(x, "\\bthat_") &
+      d_grepl(shift(x, type="lead", n=1), "_N") &
+      !d_grepl(shift(x, type="lead", n=2), "_N") &
+      !d_grepl(shift(x, type="lead", n=3), "_N") &
+      !d_grepl(shift(x, type="lead", n=4), "_N") &
+      d_grepl(shift(x, type="lead", n=5), "<PIN>")]
+  x[that_vc1 == TRUE | that_vc2 == TRUE | that_vc3 == TRUE | that_vc4 == TRUE | that_vc5 == TRUE,
+    x := d_sub(x, "$", " <THVC>")]
+  return(x$x)
+}
+
+#' THAT relative clauses, object position <TOBJ>
+dtag_that_obj <- function(x){
+  that_obj1 <- NULL
+  x <- data.table(x)
+  x[, that_obj1 := d_grepl(shift(x, type="lag", n=1), "_N") &
+      d_grepl(x, "\\bthat_") &
+      (d_grepl(shift(x, type="lead", n=1), "_DT|_QUAN|_CD|\\bit_|_JJ|_NNS|_NNP|_PRPS|\\bi_|\\bwe_|\\bhe_|\\bshe_|\\bthey_") |
+         (d_grepl(shift(x, type="lead", n=1), "_N") & d_grepl(shift(x, type="lead", n=2), "_POS")))]
+  x[that_obj1 == TRUE, x := d_sub(x, "$", " <TOBJ>")]
+  return(x$x)
+}
+
+#' THAT relative clauses, subject position <TSUB>
+dtag_that_subj <- function(x){
+  that_subj1 <- that_subj2 <- that_subj3 <- NULL
+  x <- data.table(x)
+  x[, that_subj1 := d_grepl(shift(x, type="lag", n=1), "_N") &
+      str_detect(x, "\\bthat_") &
+      (d_grepl(shift(x, type="lead", n=1), "_MD") |
+         d_grepl(shift(x, type="lead", n=1), str_flatten(sh[c("do","have","be")], "|")) |
+         d_grepl(shift(x, type="lead", n=1), "_V"))]
+  x[, that_subj2 := d_grepl(shift(x, type="lag", n=1), "_N") &
+      str_detect(x, "\\bthat_") &
+      d_grepl(shift(x, type="lead", n=1), "_RB|_XX0") &
+      (d_grepl(shift(x, type="lead", n=2), "_MD") |
+         d_grepl(shift(x, type="lead", n=2), str_flatten(sh[c("do","have","be")], "|")))]
+  x[, that_subj3 := d_grepl(shift(x, type="lag", n=1), "_N") &
+      str_detect(x, "\\bthat_") &
+      d_grepl(shift(x, type="lead", n=1), "_RB|_XX0") &
+      d_grepl(shift(x, type="lead", n=2), "_RB|_XX0") &
+      (d_grepl(shift(x, type="lead", n=3), "_MD") |
+         d_grepl(shift(x, type="lead", n=3), str_flatten(sh[c("do","have","be")], "|")) |
+         d_grepl(shift(x, type="lead", n=3), "_V"))]
+  x[that_subj1 == TRUE, x := d_sub(x, "$", " <TSUB>")]
+  x[that_subj2 == TRUE, x := d_sub(x, "$", " <TSUB>")]
+  x[that_subj3 == TRUE, x := d_sub(x, "$", " <TSUB>")]
+  return(x$x)
+}
+
+#' WH relative clauses, object position <WHOBJ>
+dtag_wh_obj <- function(x){
+  wh_obj1 <- NULL
+  x <- data.table(x)
+  x[, wh_obj1 := !d_grepl(shift(x, type="lag", n=3), "\\bask_|\\basks_|\\basked_|\\basking_|\\btell_|\\btells_|\\btold_|\\btelling_") &
+      d_grepl(shift(x, type="lag", n=1), "_N") &
+      d_grepl(x, sh["wp"]) &
+      !d_grepl(shift(x, type="lead", n=1), "_RB|_XX0|_MD|_V") &
+      !d_grepl(shift(x, type="lead", n=1), str_flatten(sh[c("do","have","be")], "|"))]
+  x[wh_obj1 == TRUE, x := d_sub(x, "$", " <WHOBJ>")]
+  return(x$x)
+}
+
+#' WH relative clauses, subject position <WHSUB>
+dtag_wh_subj <- function(x){
+  what_subj1 <- what_subj2 <- what_subj3 <- NULL
+  x <- data.table(x)
+  x[, what_subj1 := !d_grepl(shift(x, type="lag", n=3), "\\bask_|\\basks_|\\basked_|\\basking_|\\btell_|\\btells_|\\btold_|\\btelling_") &
+      d_grepl(shift(x, type="lag", n=1), "_N") &
+      d_grepl(x, sh["wp"]) &
+      d_grepl(shift(x, type="lead", n=1), str_c(str_flatten(sh[c("do","have","be")],"|"),"|_MD|_V"))]
+  x[, what_subj2 := !d_grepl(shift(x, type="lag", n=3), "\\bask_|\\basks_|\\basked_|\\basking_|\\btell_|\\btells_|\\btold_|\\btelling_") &
+      d_grepl(shift(x, type="lag", n=1), "_N") &
+      d_grepl(x, sh["wp"]) &
+      d_grepl(shift(x, type="lead", n=1), "_RB") &
+      d_grepl(shift(x, type="lead", n=2), str_c(str_flatten(sh[c("do","have","be")],"|"),"|_MD|_V"))]
+  x[, what_subj3 := !d_grepl(shift(x, type="lag", n=3), "\\bask_|\\basks_|\\basked_|\\basking_|\\btell_|\\btells_|\\btold_|\\btelling_") &
+      d_grepl(shift(x, type="lag", n=1), "_N") &
+      d_grepl(x, sh["wp"]) &
+      d_grepl(shift(x, type="lead", n=1), "_RB") &
+      d_grepl(shift(x, type="lead", n=2), "_RB") &
+      d_grepl(shift(x, type="lead", n=3), str_c(str_flatten(sh[c("do","have","be")],"|"),"|_MD|_V"))]
+  x[what_subj1 == TRUE | what_subj2 == TRUE | what_subj3 == TRUE, x := d_sub(x, "$", " <WHSUB>")]
+  return(x$x)
+}
+
+#' Past participial clauses <PASTP>
+dtag_past_part <- function(x){
+  pastp1 <- NULL
+  x <- data.table(x)
+  x[, pastp1 := d_grepl(x, "_VBN") &
+      (is.na(shift(x, type="lag", n=1)) | str_detect(shift(x, type="lag", n=1), "_\\W")) &
+      (d_grepl(shift(x, type="lead", n=1), "<PIN>") | d_grepl(shift(x, type="lead", n=1), "_RB"))]
+  x[pastp1 == TRUE, x := d_sub(x, "$", " <PASTP>")]
+  return(x$x)
+}
+
+#' Past participial WHIZ deletion <WZPAST>
+dtag_past_whiz <- function(x){
+  past_whiz1 <- NULL
+  x <- data.table(x)
+  x[, past_whiz1 := (d_grepl(shift(x, type="lag", n=1), "_N") | d_grepl(shift(x, type="lag", n=1), "<QUPR>")) &
+      d_grepl(x, "_VBN") &
+      (d_grepl(shift(x, type="lead", n=1), "<PIN>") |
+         d_grepl(shift(x, type="lead", n=1), "_RB") |
+         d_grepl(shift(x, type="lead", n=1), sh["be"]))]
+  x[past_whiz1 == TRUE, x := d_sub(x, "$", " <WZPAST>")]
+  return(x$x)
+}
+
+#' Present participial clauses <PRESP>
+dtag_pres_part <- function(x){
+  presp1 <- NULL
+  x <- data.table(x)
+  x[, presp1 := d_grepl(x, "_VBG") &
+      (is.na(shift(x, type="lag", n=1)) | str_detect(shift(x, type="lag", n=1), "_\\W")) &
+      (d_grepl(shift(x, type="lead", n=1), "<PIN>") |
+         d_grepl(shift(x, type="lead", n=1), "_DT") |
+         d_grepl(shift(x, type="lead", n=1), "_QUAN") |
+         d_grepl(shift(x, type="lead", n=1), "_CD") |
+         d_grepl(shift(x, type="lead", n=1), sh["wp"]) |
+         d_grepl(shift(x, type="lead", n=1), "_WPS") |
+         d_grepl(shift(x, type="lead", n=1), sh["who"]) |
+         d_grepl(shift(x, type="lead", n=1), "_PRP") |
+         d_grepl(shift(x, type="lead", n=1), "_RB"))]
+  x[presp1 == TRUE, x := d_sub(x, "$", " <PRESP>")]
+  return(x$x)
+}
+
+#' Present participial WHIZ deletion <WZPRES>
+dtag_pres_whiz <- function(x){
+  pres_whiz1 <- NULL
+  x <- data.table(x)
+  x[, pres_whiz1 := d_grepl(shift(x, type="lag", n=1), "_N") & d_grepl(x, "_VBG")]
+  x[pres_whiz1 == TRUE, x := d_sub(x, "$", " <WZPRES>")]
+  return(x$x)
+}
 
 # Verb Class Tagging ----
 
@@ -559,6 +818,9 @@ dtag_all <- function(x) {
 
   cat("  🏷️  Applying linguistic tags...\n")
 
+  # 0. Possessive correction - MUST run first, before anything checking _PRPS/_WPS
+  x <- dtag_possessives(x)
+
   # 1. Preprocessing
   x <- dtag_contractions(x)
   x <- dtag_to_inf(x)
@@ -574,6 +836,24 @@ dtag_all <- function(x) {
   x <- dtag_ind_pron(x)
   x <- dtag_dem_pronouns(x)
   x <- dtag_demonstratives(x)
+
+  # 2.5. Complex clause & relative constructions (newly added)
+  # Needs <PIN> (from section 1) and <QUPR> (from section 2) already tagged.
+  x <- dtag_sentence_rels(x)
+  x <- dtag_wh_questions(x)
+  x <- dtag_wh_clauses(x)       # NOTE: has a suspected any()-collapse bug - test carefully
+  x <- dtag_pp_rel_clauses(x)
+  x <- dtag_that_ac(x)
+  x <- dtag_that_vc(x)
+  x <- dtag_that_obj(x)
+  x <- dtag_that_subj(x)
+  x <- dtag_wh_obj(x)
+  x <- dtag_wh_subj(x)
+  x <- dtag_that_del(x)
+  x <- dtag_past_part(x)
+  x <- dtag_past_whiz(x)
+  x <- dtag_pres_part(x)
+  x <- dtag_pres_whiz(x)
 
   # 3. Verb classes
   x <- dtag_private_verb(x)

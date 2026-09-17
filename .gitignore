@@ -38,3 +38,4 @@ data/*.csv
 *~
 .Renviron
 .env
+!data/biber_base.rds

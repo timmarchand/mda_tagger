@@ -43,7 +43,10 @@ count_features <- function(tagged_text, per_n_words = 100) {
     "XX0", "SYNE", "CONT",
     "EMPH", "HDG", "DPAR", "HSTN",
     "QUAN", "EX", "PIN", "TIME", "PLACE",
-    "TO", "SPIN", "SPAU", "STPR"
+    "TO", "SPIN", "SPAU", "STPR",
+    "SERE", "THATD", "WHCL", "WHQU", "PIRE",
+    "THAC", "THVC", "TOBJ", "TSUB", "WHOBJ", "WHSUB",
+    "PASTP", "WZPAST", "PRESP", "WZPRES"
   )
 
   # Count each feature
