@@ -124,22 +124,50 @@ dtag_all_nouns <- function(x) {
   return(x$x)
 }
 
-#' Tag gerunds (4+ letter words ending in -ing)
-dtag_gerund <- function(x) {
-  x <- data.table(x)
-  x[d_grepl(x, "\\b\\w{4,}ing_NN"),
-    x := d_sub(x, "$", " <GER>")]
-  return(x$x)
-}
-
-#' Tag nominalizations (-tion, -ment, -ness, -ity)
+#' Tag nominalizations (-tion(s), -ment(s), -ness(es), -ity/-ities)
+#' Excludes common non-derived words that happen to end in these suffixes
+#' (e.g. "nation", "position", "moment"), following pseudobibeR's
+#' nominalization_stoplist.
 dtag_nominalisation <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "(tion|ment|ness|ity)_NN"),
+  nomz_stoplist <- c("apartment","apartments","attention","business","businesses",
+                     "capacities","capacity","cities","city","comment","comments","condition",
+                     "conditions","document","documents","edition","editions","element","elements",
+                     "environment","environments","experiment","experiments","fiction","fictions",
+                     "function","functions","humanity","identities","identity","mention","mentions",
+                     "moment","moments","motion","motions","nation","nations","notion","notions",
+                     "pity","position","positions","qualities","quality","section","sections",
+                     "solution","solutions","station","stations","tradition","traditions",
+                     "universities","university","witness","witnesses")
+
+  x[, word := tolower(d_sub(x, "_.*$", ""))]
+  x[d_grepl(x, "(tions?|ments?|ness(es)?|ity|ities)_NN") & !(word %in% nomz_stoplist),
     x := d_sub(x, "$", " <NOMZ>")]
+  x[, word := NULL]
   return(x$x)
 }
 
+#' Tag gerunds (4+ letter words ending in -ing/-ings, tagged as nouns)
+#' Excludes common non-gerund words that happen to end in -ing (e.g.
+#' "morning", "king", "something"), following pseudobibeR's
+#' gerund_stoplist.
+dtag_gerund <- function(x) {
+  x <- data.table(x)
+  ger_stoplist <- c("according","anything","beijing","bing","bings","boeing",
+                    "bring","ceiling","ceilings","cling","clings","darling","ding","dings",
+                    "during","evening","evenings","everything","fling","flings","inning",
+                    "innings","irving","king","kings","morning","mornings","nothing",
+                    "notwithstanding","offspring","offsprings","outstanding","ping","pings",
+                    "ring","rings","sing","sings","something","spring","springs","sterling",
+                    "sting","stings","string","strings","thanksgiving","thanksgivings","thing",
+                    "things","wedding","wing","wings","wrongdoing","wyoming")
+
+  x[, word := tolower(d_sub(x, "_.*$", ""))]
+  x[d_grepl(x, "\\b\\w{4,}ings?_NN") & !(word %in% ger_stoplist),
+    x := d_sub(x, "$", " <GER>")]
+  x[, word := NULL]
+  return(x$x)
+}
 
 # Verb Tagging Functions ----
 
