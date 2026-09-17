@@ -250,11 +250,20 @@ dtag_pro_do <- function(x) {
 
 # Modal Tagging Functions ----
 
+
 #' Tag possibility modals
 dtag_possibility_modal <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bcan_|\\bcould_|\\bmay_|\\bmight_"),
+  x[d_grepl(x, "\\bcan_|\\bca_|\\bcould_|\\bmay_|\\bmight_"),
     x := d_sub(x, "$", " <POMD>")]
+  return(x$x)
+}
+
+#' Tag predictive modals
+dtag_predictive_modal <- function(x) {
+  x <- data.table(x)
+  x[d_grepl(x, "\\bwill_|\\bwould_|\\bshall_|\\b'll_|\\bwo_MD|\\bsha_(MD|AFX)|\\b'd_MD"),
+    x := d_sub(x, "$", " <PRMD>")]
   return(x$x)
 }
 
@@ -266,13 +275,6 @@ dtag_necessity_modal <- function(x) {
   return(x$x)
 }
 
-#' Tag predictive modals
-dtag_predictive_modal <- function(x) {
-  x <- data.table(x)
-  x[d_grepl(x, "\\bwill_|\\bwould_|\\bshall_|\\b'll_"),
-    x := d_sub(x, "$", " <PRMD>")]
-  return(x$x)
-}
 
 
 # Adjective & Adverb Tagging ----
@@ -305,7 +307,7 @@ dtag_all_adverbs <- function(x) {
 #' Tag amplifiers
 dtag_amplifier <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\babsolutely_|\\baltogether_|\\bcompletely_|\\benormously_|\\bentirely_|\\bextremely_|\\bfully_|\\bgreatly_|\\bhighly_|\\bintensely_|\\bperfectly_|\\bstrongly_|\\bthoroughly_|\\btotally_|\\butterly_|\\bvery_"),
+  x[d_grepl(x, "\\babsolutely_|\\baltogether_|\\bcompletely_|\\bdefinitely_|\\bdrastically_|\\benormously_|\\bentirely_|\\bextremely_|\\bfully_|\\bgreatly_|\\bhighly_|\\bintensely_|\\bperfectly_|\\bstrongly_|\\bthoroughly_|\\btotally_|\\butterly_|\\bvery_"),
     x := d_sub(x, "$", " <AMP>")]
   return(x$x)
 }
@@ -321,17 +323,34 @@ dtag_downtoner <- function(x) {
 #' Tag emphatics
 dtag_emphatics <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bjust_|\\breally_|\\bmost_|\\bmore_") |
-      d_grepl(x, "\\ba lot_|\\bfor sure_|\\ba great deal_|\\bsuch a_"),
-    x := d_sub(x, "$", " <EMPH>")]
+  emph <- NULL
+  x[, emph := d_grepl(x, "\\bjust_|\\breally_|\\bmost_|\\bmore_") |
+      d_grepl(x, "\\ba lot_|\\bfor sure_|\\ba great deal_|\\bsuch a_") |
+      (d_grepl(x, "\\breal_") & d_grepl(shift(x, type = "lead", n = 1), "_JJ")) |
+      (d_grepl(x, "\\bso_") & d_grepl(shift(x, type = "lead", n = 1), "_JJ")) |
+      (d_grepl(x, "\\bdo_VB|\\bdoes_VB|\\bdoing_VB|\\bdid_VB") & d_grepl(shift(x, type = "lead", n = 1), "_V"))]
+  x[emph == TRUE, x := d_sub(x, "$", " <EMPH>")]
   return(x$x)
 }
 
 #' Tag hedges
 dtag_hedges <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bat about_|\\bsomething like_|\\bmore or less_|\\bmaybe_|\\bsort of_|\\bkind of_|\\bkinda_|\\bsorta_"),
-    x := d_sub(x, "$", " <HDG>")]
+  hedge_direct <- hedge_2word <- hedge_3word <- NULL
+
+  x[, hedge_direct := d_grepl(x, "\\bmaybe_|\\bkinda_|\\bsorta_")]
+
+  x[, hedge_2word :=
+      (d_grepl(x, "\\bat_") & d_grepl(shift(x, type = "lead", n = 1), "\\babout_")) |
+      (d_grepl(x, "\\bsomething_") & d_grepl(shift(x, type = "lead", n = 1), "\\blike_")) |
+      (d_grepl(x, "\\bsort_") & d_grepl(shift(x, type = "lead", n = 1), "\\bof_")) |
+      (d_grepl(x, "\\bkind_") & d_grepl(shift(x, type = "lead", n = 1), "\\bof_"))]
+
+  x[, hedge_3word :=
+      d_grepl(x, "\\bmore_") & d_grepl(shift(x, type = "lead", n = 1), "\\bor_") & d_grepl(shift(x, type = "lead", n = 2), "\\bless_")]
+
+  x[hedge_direct == TRUE | hedge_2word == TRUE | hedge_3word == TRUE, x := d_sub(x, "$", " <HDG>")]
+
   return(x$x)
 }
 
@@ -696,10 +715,52 @@ dtag_phrasal_coord <- function(x) {
 }
 
 #' Tag conjuncts
+#' Tag conjuncts
 dtag_conjuncts <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\balso_|\\bconsequently_|\\belse_|\\bfurthermore_|\\bhence_|\\bhowever_|\\bnevertheless_|\\botherwise_|\\brather_|\\btherefore_|\\bthus_|\\bin addition_|\\bin contrast_|\\bin particular_|\\bfor example_|\\bfor instance_|\\bthat is_"),
+  conj_direct <- conj_posit <- conj_2word <- conj_3word <- conj_4word <- NULL
+
+  # Single-word / fixed-form conjuncts, unrestricted position
+  x[, conj_direct := d_grepl(x,
+                             "\\balso_|\\balternatively_|\\bconsequently_|\\bconversely_|\\be\\.g\\._|\\bfurthermore_|\\bhence_|\\bhowever_|\\bi\\.e\\._|\\binstead_|\\blikewise_|\\bmoreover_|\\bnamely_|\\bnevertheless_|\\bnonetheless_|\\bnotwithstanding_|\\botherwise_|\\bsimilarly_|\\btherefore_|\\bthus_|\\bviz\\._")]
+
+  # Single-word conjuncts restricted to sentence-initial position
+  x[, conj_posit := d_grepl(x, "\\belse_|\\baltogether_|\\brather_") &
+      (is.na(shift(x, type = "lag", n = 1)) | str_detect(shift(x, type = "lag", n = 1), "_\\W"))]
+
+  # Two-word conjunct phrases (tagged on the first word of the phrase)
+  x[, conj_2word :=
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bcomparison_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bcontrast_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bparticular_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\baddition_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bconclusion_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bconsequence_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bsum_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bsummary_")) |
+      (d_grepl(x, "\\bfor_") & d_grepl(shift(x, type = "lead", n = 1), "\\bexample_")) |
+      (d_grepl(x, "\\bfor_") & d_grepl(shift(x, type = "lead", n = 1), "\\binstance_")) |
+      (d_grepl(x, "\\binstead_") & d_grepl(shift(x, type = "lead", n = 1), "\\bof_")) |
+      (d_grepl(x, "\\bby_") & d_grepl(shift(x, type = "lead", n = 1), "\\bcontrast_")) |
+      (d_grepl(x, "\\bby_") & d_grepl(shift(x, type = "lead", n = 1), "\\bcomparison_"))]
+
+  # Three-word conjunct phrases
+  x[, conj_3word :=
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bany_") & d_grepl(shift(x, type = "lead", n = 2), "\\bevent_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bany_") & d_grepl(shift(x, type = "lead", n = 2), "\\bcase_")) |
+      (d_grepl(x, "\\bin_") & d_grepl(shift(x, type = "lead", n = 1), "\\bother_") & d_grepl(shift(x, type = "lead", n = 2), "\\bwords_")) |
+      (d_grepl(x, "\\bas_") & d_grepl(shift(x, type = "lead", n = 1), "\\ba_") & d_grepl(shift(x, type = "lead", n = 2), "\\bresult_")) |
+      (d_grepl(x, "\\bas_") & d_grepl(shift(x, type = "lead", n = 1), "\\ba_") & d_grepl(shift(x, type = "lead", n = 2), "\\bconsequence_")) |
+      (d_grepl(x, "\\bon_") & d_grepl(shift(x, type = "lead", n = 1), "\\bthe_") & d_grepl(shift(x, type = "lead", n = 2), "\\bcontrary_"))]
+
+  # Four-word conjunct phrase
+  x[, conj_4word :=
+      d_grepl(x, "\\bon_") & d_grepl(shift(x, type = "lead", n = 1), "\\bthe_") &
+      d_grepl(shift(x, type = "lead", n = 2), "\\bother_") & d_grepl(shift(x, type = "lead", n = 3), "\\bhand_")]
+
+  x[conj_direct == TRUE | conj_posit == TRUE | conj_2word == TRUE | conj_3word == TRUE | conj_4word == TRUE,
     x := d_sub(x, "$", " <CONJ>")]
+
   return(x$x)
 }
 
@@ -733,11 +794,13 @@ dtag_contractions <- function(x) {
   return(x$x)
 }
 
-#' Tag discourse particles
+#' Tag discourse particles (sentence-initial only)
 dtag_disc_part <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bwell_|\\bnow_|\\banyhow_|\\banyways_|\\banyway_"),
-    x := d_sub(x, "$", " <DPAR>")]
+  dpar <- NULL
+  x[, dpar := d_grepl(x, "\\bwell_|\\bnow_|\\banyhow_|\\banyways_|\\banyway_") &
+      (is.na(shift(x, type = "lag", n = 1)) | str_detect(shift(x, type = "lag", n = 1), "_\\W"))]
+  x[dpar == TRUE, x := d_sub(x, "$", " <DPAR>")]
   return(x$x)
 }
 
