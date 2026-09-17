@@ -647,12 +647,22 @@ dtag_indep_cc <- function(x) {
 }
 
 #' Tag phrasal coordination
+#' Tag phrasal coordination
+#' Requires the SAME category on both sides of "and" (noun-and-noun,
+#' adjective-and-adjective, verb-and-verb, adverb-and-adverb). The previous version accepted
+#' any of the four categories independently on each side, so it also
+#' fired on mismatched pairs (e.g. adverb-and-adjective), overcounting
+#' this feature.
 dtag_phrasal_coord <- function(x) {
   x <- data.table(x)
   phc <- NULL
   x[, phc := d_grepl(x, "\\band_CC") &
-      (d_grepl(shift(x, type = "lag", n = 1), "_RB|_JJ|_NN|_V") &
-         d_grepl(shift(x, type = "lead", n = 1), "_RB|_JJ|_NN|_V"))]
+      (
+        (d_grepl(shift(x, type = "lag", n = 1), "_NN") & d_grepl(shift(x, type = "lead", n = 1), "_NN")) |
+          (d_grepl(shift(x, type = "lag", n = 1), "_JJ") & d_grepl(shift(x, type = "lead", n = 1), "_JJ")) |
+          (d_grepl(shift(x, type = "lag", n = 1), "_V")  & d_grepl(shift(x, type = "lead", n = 1), "_V"))  |
+          (d_grepl(shift(x, type = "lag", n = 1), "_RB") & d_grepl(shift(x, type = "lead", n = 1), "_RB"))
+      )]
   x[phc == TRUE, x := d_sub(x, "$", " <PHC>")]
   return(x$x)
 }
