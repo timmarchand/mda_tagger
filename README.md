@@ -3,6 +3,15 @@
 Multi-Dimensional Analysis toolkit for linguistic corpus analysis based
 on Biber (1988).
 
+## ⚠️ Development Status
+
+This app is still under active development. A debugging session on
+2026-09-17 found and fixed significant errors in the MDA scoring
+pipeline (missing tagging rules, incorrect reference statistics),
+which affected dimension scores and text-type classification.
+
+**Results generated before this date should be reprocessed.**
+
 ## 🌐 Live App
 
 Try the app online: [MDA
