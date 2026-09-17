@@ -113,12 +113,18 @@ exportUI <- function(id) {
           ns("tables_to_export"),
           "Select tables:",
           choices = c(
-            "Full results table"     = "full",
-            "Aggregated by category" = "aggregated",
-            "Summary statistics"     = "summary"
+            "Full results table"                        = "full",
+            "Aggregated by category"                     = "aggregated",
+            "Summary statistics"                          = "summary",
+            "Per-document tag/feature counts (MAT-style)" = "tag_counts"
           ),
           selected = c("full", "aggregated")
         ),
+
+        p(class = "text-muted", style = "font-size: 11px;",
+          "Tag/feature counts require MDA-tagged data (bracketed subtags). For plain
+           POS-only pre-tagged uploads, use the Keyness export's tag/POS count files
+           instead."),
 
         br(),
 

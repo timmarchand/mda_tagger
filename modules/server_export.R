@@ -161,6 +161,9 @@ exportServer <- function(id, processing_module) {
         if ("summary" %in% input$tables_to_export) {
           tables[["summary_statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
         }
+        if ("tag_counts" %in% input$tables_to_export) {
+          tables[["tag_counts"]] <- build_tag_count_matrix(results_data())
+        }
 
         if (length(tables) == 1) {
           readr::write_csv(tables[[1]], file)
@@ -181,6 +184,8 @@ exportServer <- function(id, processing_module) {
       },
       contentType = "application/octet-stream"
     )
+
+
 
     # ---- Download Plot ----
     output$download_plot <- downloadHandler(
@@ -207,6 +212,27 @@ exportServer <- function(id, processing_module) {
         )
       }
     )
+
+    # ---- Helper: per-document full-tag count matrix (MAT-style) ----
+    # Reuses build_keyness_tables()'s "tag" level, which already counts the
+    # complete curly-bracketed tag as one unit - {{JJ}} if only POS tagging
+    # is present, {{JJ<AMP>}} if MDA subtags are present too - then pivots
+    # it from long to wide (one column per tag, one row per document).
+    build_tag_count_matrix <- function(processed_data) {
+      tables <- build_keyness_tables(processed_data, feature_types = "tag", ngram_size = 1)
+
+      long        <- tables$counts[["tag"]]
+      doc_lengths <- tables$doc_lengths
+
+      wide <- long %>%
+        select(doc_id, feature, count) %>%
+        tidyr::pivot_wider(names_from = feature, values_from = count, values_fill = 0)
+
+      doc_lengths %>%
+        left_join(wide, by = "doc_id")
+    }
+
+
 
     # ---- Helper: fill a template file's {{PLACEHOLDER}} tokens ----
     fill_template <- function(template_path, replacements) {
