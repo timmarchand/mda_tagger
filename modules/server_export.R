@@ -153,7 +153,7 @@ exportServer <- function(id, processing_module) {
         tables <- list()
 
         if ("full" %in% input$tables_to_export) {
-          tables[["full_results"]] <- results_data()
+          tables[["full_results"]] <- results_data_for_stats()
         }
         if ("aggregated" %in% input$tables_to_export) {
           tables[["aggregated"]] <- aggregate_by_metadata(results_data())
@@ -162,9 +162,8 @@ exportServer <- function(id, processing_module) {
           tables[["summary_statistics"]] <- summarize_dimensions(results_data(), group_by = "metadata")
         }
         if ("tag_counts" %in% input$tables_to_export) {
-          tables[["tag_counts"]] <- build_tag_count_matrix(results_data())
+          tables[["tag_counts"]] <- build_tag_count_matrix(results_data_for_stats())
         }
-
         if (length(tables) == 1) {
           readr::write_csv(tables[[1]], file)
         } else {
@@ -214,10 +213,10 @@ exportServer <- function(id, processing_module) {
     )
 
     # ---- Helper: per-document full-tag count matrix (MAT-style) ----
-    # Reuses build_keyness_tables()'s "tag" level, which already counts the
-    # complete curly-bracketed tag as one unit - {{JJ}} if only POS tagging
-    # is present, {{JJ<AMP>}} if MDA subtags are present too - then pivots
-    # it from long to wide (one column per tag, one row per document).
+    # build_keyness_tables()'s internal doc_lengths tibble is built from
+    # scratch with only doc_id/metadata/n_words, so any extra predictor
+    # columns from an uploaded metadata CSV get silently dropped partway
+    # through. Re-attach them here, by doc_id, after the tag matrix is built.
     build_tag_count_matrix <- function(processed_data) {
       tables <- build_keyness_tables(processed_data, feature_types = "tag", ngram_size = 1)
 
@@ -228,11 +227,25 @@ exportServer <- function(id, processing_module) {
         select(doc_id, feature, count) %>%
         tidyr::pivot_wider(names_from = feature, values_from = count, values_fill = 0)
 
-      doc_lengths %>%
-        left_join(wide, by = "doc_id")
+      result <- doc_lengths %>%
+        mutate(doc_id = as.character(doc_id)) %>%
+        left_join(wide %>% mutate(doc_id = as.character(doc_id)), by = "doc_id")
+
+      standard_cols <- c("doc_id", "metadata", "n_words", "tagged_text", "text",
+                         "Dimension1", "Dimension2", "Dimension3", "Dimension4",
+                         "Dimension5", "closest_text_type")
+      extra_cols <- setdiff(names(processed_data), standard_cols)
+
+      if (length(extra_cols) > 0) {
+        extra_df <- processed_data %>%
+          mutate(doc_id = as.character(doc_id)) %>%
+          select(doc_id, all_of(extra_cols))
+        result <- result %>%
+          left_join(extra_df, by = "doc_id")
+      }
+
+      result
     }
-
-
 
     # ---- Helper: fill a template file's {{PLACEHOLDER}} tokens ----
     fill_template <- function(template_path, replacements) {
