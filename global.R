@@ -37,17 +37,23 @@ cat("═════════════════════════
 # ==== Load Data ====
 cat("📊 Loading reference data...\n")
 
+# Rebuild a cached .rds when it is missing or older than its create_*.R script,
+# so edits to the pattern/norm definitions take effect without manual deletion
+rds_stale <- function(rds, script) {
+  !file.exists(rds) || file.mtime(script) > file.mtime(rds)
+}
+
 # Load sh regex patterns
-if (!file.exists("data/sh.rds")) {
-  cat("   ⚠️  data/sh.rds not found — generating...\n")
+if (rds_stale("data/sh.rds", "data/create_sh.R")) {
+  cat("   ⚠️  data/sh.rds missing or out of date — generating...\n")
   source("data/create_sh.R")
 }
 sh <- readRDS("data/sh.rds")
 cat("   ✓ sh patterns loaded (", length(sh), " patterns)\n", sep = "")
 
 # Load biber_base statistics
-if (!file.exists("data/biber_base.rds")) {
-  cat("   ⚠️  data/biber_base.rds not found — generating...\n")
+if (rds_stale("data/biber_base.rds", "data/create_biber_base.R")) {
+  cat("   ⚠️  data/biber_base.rds missing or out of date — generating...\n")
   source("data/create_biber_base.R")
 }
 biber_base <- readRDS("data/biber_base.rds")

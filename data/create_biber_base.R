@@ -14,7 +14,10 @@ library(tibble)
 # Nini's values equal Table 4.5's per-1000-word figures divided by 10,
 # matching this app's per-100-words normalization convention.
 # Dimension/loading assignments are cross-checked against Biber (1988)
-# Table 6.1 ("Summary of the factorial structure").
+# Table 6.1 ("Summary of the factorial structure"). Following Biber's
+# scoring procedure, each feature counts only on the dimension where it
+# has its highest loading, so present tense and attributive adjectives
+# score on Dimension 1 only, and Dimension 5 has no negative features.
 
 biber_base <- tibble::tribble(
   ~dimension, ~feature, ~detail, ~biber_mean, ~biber_sd, ~loading,
@@ -27,7 +30,8 @@ biber_base <- tibble::tribble(
   "Dimension1", "BEMA", "BE as main verb", 2.83, 0.95, 1,
   "Dimension1", "CAUS", "Causative subordination", 0.11, 0.17, 1,
   "Dimension1", "DPAR", "Discourse particles", 0.12, 0.23, 1,
-  "Dimension1", "DEMO", "Demonstrative pronouns", 0.99, 0.42, 1,
+  "Dimension1", "DEMP", "Demonstrative pronouns", 0.46, 0.48, 1,
+  "Dimension1", "INPR", "Indefinite pronouns", 0.14, 0.20, 1,
   "Dimension1", "EMPH", "Emphatics", 0.63, 0.42, 1,
   "Dimension1", "HDG", "Hedges", 0.06, 0.13, 1,
   "Dimension1", "AMP", "Amplifiers", 0.27, 0.26, 1,
@@ -56,24 +60,19 @@ biber_base <- tibble::tribble(
   "Dimension2", "PUBV", "Public verbs", 0.77, 0.54, 1,
   "Dimension2", "SYNE", "Synthetic negation", 0.17, 0.16, 1,
   "Dimension2", "PRESP", "Present participial clauses", 0.1, 0.17, 1,
-  "Dimension2", "VPRT", "Present tense verbs", 7.77, 3.43, -1,
-  "Dimension2", "JJ", "Attributive adjectives", 6.07, 1.88, -1,
 
   # Dimension 3: Explicit vs. Situation-Dependent Reference
   "Dimension3", "WHSUB", "WH relative clauses on subject position", 0.21, 0.20, 1,
   "Dimension3", "PIRE", "Pied-piping relatives", 0.07, 0.11, 1,
   "Dimension3", "WHOBJ", "WH relative clauses on object position", 0.14, 0.17, 1,
-  "Dimension3", "THVC", "THAT relative clauses on verb complements", 0.33, 0.29, 1,
-  "Dimension3", "THAC", "THAT relative clauses on adjective complements", 0.03, 0.06, 1,
+  "Dimension3", "PHC", "Phrasal coordination", 0.34, 0.27, 1,
   "Dimension3", "NOMZ", "Nominalizations", 1.99, 1.44, 1,
-  "Dimension3", "TSUB", "THAT relative clauses on subject position", 0.04, 0.08, 1,
-  "Dimension3", "TOBJ", "THAT relative clauses on object position", 0.08, 0.11, 1,
   "Dimension3", "TIME", "Time adverbials", 0.52, 0.35, -1,
   "Dimension3", "PLACE", "Place adverbials", 0.31, 0.34, -1,
   "Dimension3", "RB", "Adverbs", 6.56, 1.76, -1,
 
   # Dimension 4: Overt Expression of Persuasion
-  "Dimension4", "INPR", "Infinitives", 0.14, 0.20, 1,
+  "Dimension4", "TO", "Infinitives", 1.49, 0.56, 1,
   "Dimension4", "PRMD", "Prediction modals", 0.56, 0.42, 1,
   "Dimension4", "SUAV", "Suasive verbs", 0.29, 0.31, 1,
   "Dimension4", "COND", "Conditional subordination", 0.25, 0.22, 1,
@@ -87,18 +86,21 @@ biber_base <- tibble::tribble(
   "Dimension5", "PASTP", "Past participial clauses", 0.01, 0.04, 1,
   "Dimension5", "WZPAST", "Past participial WHIZ deletion", 0.25, 0.31, 1,
   "Dimension5", "OSUB", "Other subordination", 0.1, 0.11, 1,
-  "Dimension5", "PHC", "Phrasal coordination", 0.34, 0.27, -1,
 
   # Additional features not in dimensions
   "Others", "CONC", "Concessive subordination", 0.05, 0.08, 0,
   "Others", "GER", "Gerunds", 0.7, 0.38, 0,
   "Others", "QUPR", "Quantifier pronouns", 0.3, 0.4, 0,
   "Others", "QUAN", "Quantifiers", 1.8, 1.0, 0,
-  "Others", "DEMP", "Demonstrative pronouns (determiner)", 0.46, 0.48, 0,
+  "Others", "DEMO", "Demonstratives (determiners)", 0.99, 0.42, 0,
   "Others", "DWNT", "Downtoners", 0.2, 0.16, 0,
   "Others", "SMP", "Seem/appear", 0.08, 0.1, 0,
   "Others", "EX", "Existential THERE", 0.22, 0.18, 0,
-  "Others", "TO", "Infinitive TO", 1.49, 0.56, 0,
+  # THAT clauses: these load on Biber's Dimension 6, which is not scored here
+  "Others", "THVC", "THAT verb complements", 0.33, 0.29, 0,
+  "Others", "THAC", "THAT adjective complements", 0.03, 0.06, 0,
+  "Others", "TSUB", "THAT relative clauses on subject position", 0.04, 0.08, 0,
+  "Others", "TOBJ", "THAT relative clauses on object position", 0.08, 0.11, 0,
   "Others", "WZPRES", "Present participial WHIZ deletion", 0.1, 0.17, 0
 )
 

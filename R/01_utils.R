@@ -74,25 +74,35 @@ dtag_third_person_pronoun <- function(x) {
 }
 
 #' Tag pronoun IT
+#' Biber (1988) counts "it" only; "its" and "itself" are not included.
 dtag_pronoun_it <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bit_|\\bits_|\\bitself_"),
+  x[d_grepl(x, "\\bit_"),
     x := d_sub(x, "$", " <PIT>")]
   return(x$x)
 }
 
 #' Tag demonstrative pronouns (that, this, these, those as pronouns)
+#' Biber (1988): that/this/these/those + V / AUX / punctuation / WHP / and.
+#' Determiner uses ("this question") are left for dtag_demonstratives().
 dtag_dem_pronouns <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bthat_DT|\\bthis_DT|\\bthese_DT|\\bthose_DT"),
-    x := d_sub(x, "$", " <DEMP>")]
+  demp <- NULL
+  x[, demp := d_grepl_case(x, "^(?i:that|this|these|those)_DT") &
+      (d_grepl_case(shift(x, type = "lead", n = 1), "_(V|MD)") |
+         d_grepl_case(shift(x, type = "lead", n = 1), "_[[:punct:]]") |
+         d_grepl(shift(x, type = "lead", n = 1), str_c(sh["wp"], "|\\band_")) |
+         is.na(shift(x, type = "lead", n = 1)))]
+  x[demp == TRUE, x := d_sub(x, "$", " <DEMP>")]
   return(x$x)
 }
 
 #' Tag demonstratives (as determiners)
+#' Only determiner-tagged forms; complementiser/relative "that" (_IN, _WDT)
+#' is not a demonstrative.
 dtag_demonstratives <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bthat_|\\bthis_|\\bthese_|\\bthose_") & !d_grepl(x, "<DEMP>"),
+  x[d_grepl_case(x, "^(?i:that|this|these|those)_DT") & !d_grepl(x, "<DEMP>"),
     x := d_sub(x, "$", " <DEMO>")]
   return(x$x)
 }
@@ -100,7 +110,8 @@ dtag_demonstratives <- function(x) {
 #' Tag indefinite pronouns
 dtag_ind_pron <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bnobody_|\\bnone_|\\bnothing_|\\bnowhere_"),
+  # Full Biber (1988) list; the D1 norms (1.4 / 2.0 per 1000) assume all of these
+  x[d_grepl(x, "\\banybody_|\\banyone_|\\banything_|\\beverybody_|\\beveryone_|\\beverything_|\\bnobody_|\\bnone_|\\bnothing_|\\bnowhere_|\\bsomebody_|\\bsomeone_|\\bsomething_"),
     x := d_sub(x, "$", " <INPR>")]
   return(x$x)
 }
@@ -214,9 +225,11 @@ dtag_passives <- function(x, by = FALSE) {
 
   if (by) {
     by_phrase <- NULL
-    x[, by_phrase := (passive1 | passive2) & d_grepl(shift(x, type = "lead", n = 1), "\\bby_") |
-        d_grepl(shift(x, type = "lead", n = 2), "\\bby_") |
-        d_grepl(shift(x, type = "lead", n = 3), "\\bby_")]
+    # BE + VBN + by  /  BE + X + VBN + by. The previous version lacked
+    # brackets, so "| lead 2/3 is by" fired on any token two or three
+    # places before "by", passive or not.
+    x[, by_phrase := (passive1 & d_grepl(shift(x, type = "lead", n = 2), "\\bby_")) |
+        (passive2 & d_grepl(shift(x, type = "lead", n = 3), "\\bby_"))]
     x[by_phrase == TRUE, x := d_sub(x, "$", " <BYPA>")]
     x[!by_phrase & (passive1 | passive2), x := d_sub(x, "$", " <PASS>")]
   } else {
@@ -241,8 +254,22 @@ dtag_be_main <- function(x) {
 dtag_pro_do <- function(x) {
   x <- data.table(x)
   prod <- NULL
+  # Biber (1988): DO, except DO + (ADV) + V (auxiliary) and
+  # punctuation/WHP + DO (question inversion). "n't"/"not" are _RB tokens,
+  # so "do n't know" is auxiliary. DO + pronoun/noun + V ("do you know",
+  # "does it seem") is also treated as auxiliary.
+  lead1 <- shift(x$x, type = "lead", n = 1)
+  lead2 <- shift(x$x, type = "lead", n = 2)
+  lead3 <- shift(x$x, type = "lead", n = 3)
+  lag1  <- shift(x$x, type = "lag", n = 1)
   x[, prod := d_grepl(x, sh["do"]) &
-      !d_grepl(shift(x, type = "lead", n = 1), "_VB")]
+      !d_grepl_case(lead1, "_VB") &
+      !(d_grepl_case(lead1, "_RB") & d_grepl_case(lead2, "_VB")) &
+      !(d_grepl_case(lead1, "_RB") & d_grepl_case(lead2, "_RB") & d_grepl_case(lead3, "_VB")) &
+      !(d_grepl_case(lead1, "_(PRP|NN|EX)") & d_grepl_case(lead2, "_VB")) &
+      !(d_grepl_case(lead1, "_(PRP|NN|EX)") & d_grepl_case(lead2, "_RB") & d_grepl_case(lead3, "_VB")) &
+      !(d_grepl_case(lead1, "_DT") & d_grepl_case(lead2, "_NN") & d_grepl_case(lead3, "_VB")) &
+      !d_grepl(lag1, str_c(sh["who"], "|", sh["wp"]))]
   x[prod == TRUE, x := d_sub(x, "$", " <PROD>")]
   return(x$x)
 }
@@ -262,7 +289,7 @@ dtag_possibility_modal <- function(x) {
 #' Tag predictive modals
 dtag_predictive_modal <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bwill_|\\bwould_|\\bshall_|\\b'll_|\\bwo_MD|\\bsha_(MD|AFX)|\\b'd_MD"),
+  x[d_grepl(x, "\\bwill_|\\bwould_|\\bshall_|(?<!\\w)['\u2019]ll_|\\bwo_MD|\\bsha_(MD|AFX)|(?<!\\w)['\u2019]d_MD"),
     x := d_sub(x, "$", " <PRMD>")]
   return(x$x)
 }
@@ -654,7 +681,9 @@ dtag_seem_appear <- function(x) {
 #' Tag causative subordinators
 dtag_causative <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bbecause_|\\bcos_|\\bsince_"),
+  # Biber (1988): "because" only ("cos" kept as its spoken form).
+  # "since" is an other adverbial subordinator (OSUB).
+  x[d_grepl(x, "\\bbecause_|\\bcos_|\\bcause_IN"),
     x := d_sub(x, "$", " <CAUS>")]
   return(x$x)
 }
@@ -678,7 +707,19 @@ dtag_conditional <- function(x) {
 #' Tag other adverbial subordinators
 dtag_adverbial_subords <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bwhereas_|\\bwhereby_|\\bwherein_|\\bwhereupon_"),
+  osub <- NULL
+  lead1 <- shift(x$x, type = "lead", n = 1)
+  lead2 <- shift(x$x, type = "lead", n = 2)
+  # Biber (1988): since, while, whilst, whereupon, whereas, whereby,
+  # such that, so that, inasmuch as, forasmuch as, insofar as, insomuch as,
+  # as long as, as soon as. "since"/"while" only when tagged as
+  # subordinators (_IN) and not followed by a number ("since 1990").
+  x[, osub := d_grepl(x, "\\bwhereas_|\\bwhereby_|\\bwherein_|\\bwhereupon_|\\bwhilst_") |
+      (d_grepl_case(x, "^(?i:since|while)_IN") & !d_grepl_case(lead1, "_CD")) |
+      (d_grepl(x, "\\bso_|\\bsuch_") & d_grepl_case(lead1, "^(?i:that)_IN")) |
+      (d_grepl(x, "\\binasmuch_|\\bforasmuch_|\\binsofar_|\\binsomuch_") & d_grepl(lead1, "\\bas_")) |
+      (d_grepl(x, "\\bas_") & d_grepl(lead1, "\\blong_|\\bsoon_") & d_grepl(lead2, "\\bas_"))]
+  x[osub == TRUE,
     x := d_sub(x, "$", " <OSUB>")]
   return(x$x)
 }
@@ -687,8 +728,14 @@ dtag_adverbial_subords <- function(x) {
 dtag_indep_cc <- function(x) {
   x <- data.table(x)
   andc <- NULL
+  # Biber (1988): clause punctuation + and, or
+  # , + and + it/so/then/you/there/demonstrative pronoun/subject pronoun
+  lag1  <- shift(x$x, type = "lag", n = 1)
+  lead1 <- shift(x$x, type = "lead", n = 1)
   x[, andc := d_grepl(x, "\\band_CC") &
-      d_grepl(shift(x, type = "lag", n = 1), "\\._\\.|\\?_\\.|\\!_\\.")]
+      (d_grepl(lag1, "\\._\\.|\\?_\\.|\\!_\\.|;_:") |
+         (d_grepl_case(lag1, "^,_,") &
+            d_grepl(lead1, "\\bit_|\\bso_|\\bthen_|\\byou_|\\bthere_EX|<DEMP>|\\bi_PRP|\\bwe_|\\bhe_|\\bshe_|\\bthey_")))]
   x[andc == TRUE, x := d_sub(x, "$", " <ANDC>")]
   return(x$x)
 }
@@ -722,7 +769,7 @@ dtag_conjuncts <- function(x) {
 
   # Single-word / fixed-form conjuncts, unrestricted position
   x[, conj_direct := d_grepl(x,
-                             "\\balso_|\\balternatively_|\\bconsequently_|\\bconversely_|\\be\\.g\\._|\\bfurthermore_|\\bhence_|\\bhowever_|\\bi\\.e\\._|\\binstead_|\\blikewise_|\\bmoreover_|\\bnamely_|\\bnevertheless_|\\bnonetheless_|\\bnotwithstanding_|\\botherwise_|\\bsimilarly_|\\btherefore_|\\bthus_|\\bviz\\._")]
+                             "\\balternatively_|\\bconsequently_|\\bconversely_|\\be\\.g\\._|\\bfurthermore_|\\bhence_|\\bhowever_|\\bi\\.e\\._|\\binstead_|\\blikewise_|\\bmoreover_|\\bnamely_|\\bnevertheless_|\\bnonetheless_|\\bnotwithstanding_|\\botherwise_|\\bsimilarly_|\\btherefore_|\\bthus_|\\bviz\\._")]
 
   # Single-word conjuncts restricted to sentence-initial position
   x[, conj_posit := d_grepl(x, "\\belse_|\\baltogether_|\\brather_") &
@@ -778,8 +825,12 @@ dtag_negation <- function(x) {
 #' Tag synthetic negation (no, neither, nor)
 dtag_syn_negation <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bno_|\\bneither_|\\bnor_"),
-    x := d_sub(x, "$", " <SYNE>")]
+  # Biber (1988): no + QUANT/ADJ/N, neither, nor. Interjection "no" is excluded.
+  syne <- NULL
+  lead1 <- shift(x$x, type = "lead", n = 1)
+  x[, syne := d_grepl(x, "\\bneither_|\\bnor_") |
+      (d_grepl(x, "\\bno_") & (d_grepl_case(lead1, "_(JJ|NN|CD)") | d_grepl(lead1, "<QUAN>|\\b(one|more|less|longer|other|such)_")))]
+  x[syne == TRUE, x := d_sub(x, "$", " <SYNE>")]
   return(x$x)
 }
 
@@ -789,7 +840,12 @@ dtag_syn_negation <- function(x) {
 #' Tag contractions
 dtag_contractions <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "'"),
+  # Clitic tokens only: n't, 're, 've, 'll, 'm, 'd, and 's when it is a
+  # verb or "let's" (not the possessive _POS). Straight or curly apostrophe.
+  # Quotation marks and possessives are not contractions.
+  x[d_grepl_case(x, "^(?i:n['\u2019]t)_") |
+      d_grepl_case(x, "^['\u2019](?i:re|ve|ll|m|d)_") |
+      d_grepl_case(x, "^['\u2019](?i:s)_(VBZ|PRP)"),
     x := d_sub(x, "$", " <CONT>")]
   return(x$x)
 }
@@ -885,8 +941,17 @@ dtag_split_infinitives <- function(x) {
 dtag_split_auxiliaries <- function(x) {
   x <- data.table(x)
   spau <- NULL
-  x[, spau := (d_grepl(x, sh["have"]) | d_grepl(x, sh["be"]) | d_grepl(x, sh["do"])) &
-      d_grepl(shift(x, type = "lead", n = 1), "_RB")]
+  # Biber (1988): AUX (modal/have/be/do) + ADV + (ADV) + V.
+  # Negators (not/n't) do not count as the splitting adverb.
+  neg <- "^(?i:not|n['\u2019]t)_"
+  lead1 <- shift(x$x, type = "lead", n = 1)
+  lead2 <- shift(x$x, type = "lead", n = 2)
+  lead3 <- shift(x$x, type = "lead", n = 3)
+  aux <- d_grepl(x$x, sh["have"]) | d_grepl(x$x, sh["be"]) | d_grepl(x$x, sh["do"]) | d_grepl_case(x$x, "_MD")
+  x[, spau := aux &
+      d_grepl_case(lead1, "_RB") & !d_grepl_case(lead1, neg) &
+      (d_grepl_case(lead2, "_VB") |
+         (d_grepl_case(lead2, "_RB") & !d_grepl_case(lead2, neg) & d_grepl_case(lead3, "_VB")))]
   x[spau == TRUE, x := d_sub(x, "$", " <SPAU>")]
   return(x$x)
 }
@@ -925,8 +990,8 @@ dtag_all <- function(x) {
   # 1. Preprocessing
   x <- dtag_contractions(x)
   x <- dtag_to_inf(x)
+  x <- dtag_to_prep(x)       # must precede dtag_prepositions so "to_IN" gets <PIN>
   x <- dtag_prepositions(x)
-  x <- dtag_to_prep(x)
 
   # 2. Pronouns
   x <- dtag_first_person_pronoun(x)
@@ -1027,15 +1092,22 @@ dtag_all <- function(x) {
 
 #' Calculate Average Word Length and Type-Token Ratio
 #'
+#' TTR follows Biber (1988): the number of different words in the first
+#' `ttr_window` words of the text (default 400), x 100. Computing it over the
+#' whole text makes it fall with text length and inflates Dimension 1.
+#' Punctuation tokens are excluded from both measures.
+#'
 #' @param tagged_text Character vector of tagged tokens
+#' @param ttr_window Number of words used for TTR (Biber: 400)
 #' @return List with AWL and TTR
-add_awl_ttr <- function(tagged_text) {
+add_awl_ttr <- function(tagged_text, ttr_window = 400) {
 
-  # Extract words (remove POS tags and feature tags)
-  words <- gsub("_[A-Z]+.*$", "", tagged_text)
-  words <- gsub("<[^>]+>", "", words)
+  # Extract words: drop feature tags, then the final _POS suffix
+  words <- gsub("<[^>]+>", "", tagged_text)
   words <- trimws(words)
-  words <- words[nchar(words) > 0]
+  words <- sub("_[^_]*$", "", words)
+  # Keep only tokens containing a letter or digit (drops punctuation)
+  words <- words[grepl("[[:alnum:]]", words)]
 
   if (length(words) == 0) {
     return(list(AWL = 0, TTR = 0))
@@ -1044,10 +1116,9 @@ add_awl_ttr <- function(tagged_text) {
   # Average Word Length
   awl <- mean(nchar(words))
 
-  # Type-Token Ratio
-  types <- length(unique(tolower(words)))
-  tokens <- length(words)
-  ttr <- (types / tokens) * 100
+  # Type-Token Ratio over the first ttr_window words
+  ttr_words <- tolower(head(words, ttr_window))
+  ttr <- (length(unique(ttr_words)) / length(ttr_words)) * 100
 
   return(list(AWL = awl, TTR = ttr))
 }
