@@ -6,7 +6,9 @@
 # ---- Punctuation-adjacency patterns available in the check ----
 # "adjacency" kind: a single "before" character, the punctuation mark
 # itself, and a single "after" character, with no space between any of
-# them - e.g. "on.Should". Fixed with a single space insertion.
+# them - e.g. "on.Should". Fixed with a single space insertion. The "after"
+# character is a lookahead so matches can chain: in "p.c.of" both "p.c" and
+# "c.o" are found (a consumed "c" would otherwise hide the second one).
 #
 # "span" kind: a variable-length match (e.g. an HTML tag) that gets
 # replaced entirely with a single space, since deleting it outright would
@@ -17,22 +19,22 @@ issue_defs <- list(
        pattern = "</?[a-zA-Z][a-zA-Z0-9]*\\s*/?>|&[a-zA-Z#][a-zA-Z0-9]*;"),
   list(id = "period_upper", short = "Period+Cap", kind = "adjacency",
        label = "Period + capital letter, no space (default) - e.g. \"on.Should\"",
-       pattern = "[a-z]\\.[A-Z]"),
+       pattern = "[a-z]\\.(?=[A-Z])"),
   list(id = "period_lower", short = "Per+low", kind = "adjacency", subtype = "exclude_common",
        label = "Period + lowercase letter, no space, excluding common abbreviations/URLs - e.g. \"on.should\"",
-       pattern = "[a-z]\\.[a-z]"),
+       pattern = "[a-z]\\.(?=[a-z])"),
   list(id = "period_lower_common", short = "Per+low (common)", kind = "adjacency", subtype = "common_only",
        label = "Period + lowercase - common abbreviations/URLs only, for separate review - e.g. \"a.m.\", \"google.com\"",
-       pattern = "[a-z]\\.[a-z]"),
+       pattern = "[a-z]\\.(?=[a-z])"),
   list(id = "comma_word", short = "Comma", kind = "adjacency",
        label = "Comma + letter, no space - e.g. \"cats,dogs\"",
-       pattern = "[a-zA-Z],[a-zA-Z]"),
+       pattern = "[a-zA-Z],(?=[a-zA-Z])"),
   list(id = "question_excl", short = "?/!", kind = "adjacency",
        label = "Question mark or exclamation point + letter, no space - e.g. \"now?Then\"",
-       pattern = "[a-zA-Z][?!][A-Za-z]"),
+       pattern = "[a-zA-Z][?!](?=[A-Za-z])"),
   list(id = "semicolon_colon", short = ";/:", kind = "adjacency",
        label = "Semicolon or colon + letter, no space - e.g. \"first;second\"",
-       pattern = "[a-zA-Z][;:][A-Za-z]")
+       pattern = "[a-zA-Z][;:](?=[A-Za-z])")
 )
 
 DEFAULT_ISSUE_TYPES <- c("html_residue", "period_upper")
@@ -129,9 +131,18 @@ tokenCheckServer <- function(id, data_module, paren_session = NULL) {
       data
     })
 
+    # ---- Ignore list: one entry per line, blank lines dropped ----
+    ignore_terms <- reactive({
+      raw <- input$ignore_terms
+      if (is.null(raw) || !nzchar(trimws(raw))) return(character())
+      terms <- trimws(strsplit(raw, "\n", fixed = TRUE)[[1]])
+      unique(terms[nzchar(terms)])
+    })
+
     # ---- Scan whichever text is currently active, for every currently
-    #      selected pattern (adjacency or span kind) ----
-    scan_results <- reactive({
+    #      selected pattern (adjacency or span kind), before the ignore
+    #      list is applied ----
+    all_hits <- reactive({
       req(scan_triggered())
       data <- patched_selected_text_and_meta()
       validate(need(!is.null(data) && length(data$text) > 0,
@@ -202,6 +213,49 @@ tokenCheckServer <- function(id, data_module, paren_session = NULL) {
       hits
     })
 
+    # ---- Drop hits that fall inside an ignore-list string. For an
+    #      adjacency hit the character before the punctuation, the
+    #      punctuation itself and the character after must all lie inside
+    #      one occurrence of the string. So with "p.c." the internal period
+    #      in "p.c." is ignored, but "p.c.of" is still flagged because the
+    #      "o" lies outside it. A span hit (e.g. HTML) must lie wholly
+    #      inside an occurrence. ----
+    scan_results <- reactive({
+      hits  <- all_hits()
+      terms <- ignore_terms()
+      if (nrow(hits) == 0 || length(terms) == 0) return(hits)
+
+      texts <- patched_selected_text_and_meta()$text
+      flags <- if (isTRUE(input$ignore_case)) "(?i)" else ""
+      patterns <- paste0(flags, "\\Q", terms, "\\E")
+
+      occurrences <- function(txt) {
+        bind_rows(lapply(patterns, function(pat) {
+          m <- gregexpr(pat, txt, perl = TRUE)[[1]]
+          if (m[1] == -1) return(NULL)
+          tibble(start = as.integer(m), end = as.integer(m + attr(m, "match.length") - 1))
+        }))
+      }
+
+      keep <- rep(TRUE, nrow(hits))
+      for (di in unique(hits$doc_idx)) {
+        occ <- occurrences(texts[di])
+        if (is.null(occ) || nrow(occ) == 0) next
+        rows <- which(hits$doc_idx == di)
+        for (r in rows) {
+          if (identical(hits$kind[r], "span")) {
+            from <- hits$position[r]; to <- hits$end[r]
+          } else {
+            from <- hits$position[r] - 1; to <- hits$position[r] + 1
+          }
+          if (any(occ$start <= from & occ$end >= to)) keep[r] <- FALSE
+        }
+      }
+      out <- hits[keep, , drop = FALSE]
+      attr(out, "n_ignored") <- sum(!keep)
+      out
+    })
+
     output$has_issues <- reactive({
       tryCatch(scan_triggered() && nrow(scan_results()) > 0, error = function(e) FALSE)
     })
@@ -228,9 +282,17 @@ tokenCheckServer <- function(id, data_module, paren_session = NULL) {
                    "Select at least one pattern to check, then scan again."))
       }
       if (nrow(hits) == 0) {
+        n_ignored <- attr(hits, "n_ignored") %||% 0
         return(div(class = "alert alert-success", style = "padding: 8px 12px;",
-                   paste0("No instances found for the selected pattern(s)", fixed_note, ".")))
+                   paste0("No instances found for the selected pattern(s)", fixed_note, ".",
+                          if (n_ignored > 0) paste0(" (", n_ignored, " skipped by the ignore list.)") else "")))
       }
+
+      n_ignored <- attr(hits, "n_ignored") %||% 0
+      ignored_note <- if (n_ignored > 0) {
+        paste0(" ", n_ignored, " further instance", if (n_ignored != 1) "s were" else " was",
+               " skipped by the ignore list.")
+      } else ""
 
       n_docs <- n_distinct(hits$doc_id)
       div(
@@ -239,7 +301,7 @@ tokenCheckServer <- function(id, data_module, paren_session = NULL) {
           "Found <strong>", nrow(hits), "</strong> instance",
           if (nrow(hits) != 1) "s" else "",
           " across <strong>", n_docs, "</strong> document",
-          if (n_docs != 1) "s" else "", fixed_note, "."
+          if (n_docs != 1) "s" else "", fixed_note, ".", ignored_note
         ))
       )
     })
@@ -286,6 +348,24 @@ tokenCheckServer <- function(id, data_module, paren_session = NULL) {
         req(nrow(hits) > 0)
         out <- hits %>%
           transmute(doc_id, type = type_short, position, context = paste0(before, match_text, after))
+        readr::write_csv(out, file)
+      },
+      contentType = "text/csv"
+    )
+
+    # ---- The whole corpus as it currently stands (fixes applied), in a
+    #      CSV that the Upload tab can read back in ----
+    output$download_fixed <- downloadHandler(
+      filename = function() paste0("corpus_tokenfixed_", format(Sys.Date(), "%Y%m%d"), ".csv"),
+      content = function(file) {
+        data <- patched_selected_text_and_meta()
+        req(data, length(data$text) > 0)
+        n <- length(data$text)
+        out <- tibble(
+          doc_id   = if (length(data$doc_ids) == n) as.character(data$doc_ids) else sprintf("doc_%03d", seq_len(n)),
+          metadata = if (length(data$meta) == n) as.character(data$meta) else NA_character_,
+          text     = as.character(data$text)
+        )
         readr::write_csv(out, file)
       },
       contentType = "text/csv"

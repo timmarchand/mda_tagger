@@ -37,6 +37,20 @@ tokenCheckUI <- function(id) {
           tags$code("<br/>"), " can otherwise mask emails and URLs from the period + lowercase ",
           "letter check, making them look like unresolved run-ons."),
 
+        textAreaInput(
+          ns("ignore_terms"),
+          "Ignore list (one entry per line):",
+          value = "",
+          rows = 3,
+          placeholder = "p.c.\nU.K."
+        ),
+        checkboxInput(ns("ignore_case"), "Ignore case when matching the ignore list", value = TRUE),
+        p(class = "text-muted", style = "font-size: 11px;",
+          "Any match that falls inside one of these strings is left out of the results, ",
+          "so it is neither reported nor fixed. Include the final period (", tags$code("p.c."),
+          " rather than ", tags$code("p.c"), ") so that a real run-on straight after it, as in ",
+          tags$code("p.c.of"), ", is still flagged."),
+
         p(class = "text-muted", style = "font-size: 11px;",
           "Every row below starts selected. If a match is a false positive you don't want ",
           "changed — e.g. ", tags$code("e.g."), " or ", tags$code("a.m."),
@@ -68,6 +82,17 @@ tokenCheckUI <- function(id) {
 
         br(),
         uiOutput(ns("status_banner")),
+
+        conditionalPanel(
+          condition = paste0("output['", ns("is_fixed"), "']"),
+          downloadButton(ns("download_fixed"), "Download Fixed Corpus (CSV)",
+                         class = "btn-success btn-sm"),
+          p(class = "text-muted", style = "font-size: 11px; margin-top: 6px;",
+            "Saves every text as it currently stands (fixes applied) with columns ",
+            tags$code("doc_id"), ", ", tags$code("metadata"), " and ", tags$code("text"),
+            ". Upload it as a CSV on the Upload tab next time and choose those columns ",
+            "to skip this check.")
+        ),
 
         conditionalPanel(
           condition = paste0("output['", ns("has_issues"), "']"),
