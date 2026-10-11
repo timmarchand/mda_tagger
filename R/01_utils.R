@@ -324,9 +324,14 @@ dtag_pred_adj <- function(x) {
 }
 
 #' Tag all adverbs
+#' Biber (1988) counts total adverbs (RB/RBR/RBS), so adverbs that also carry
+#' another feature tag (time/place adverbials, emphatics, downtoners, ...)
+#' still count here. Negation (not/n't) is excluded; it has its own feature
+#' (XX0). The previous version counted only adverbs with no other tag, which
+#' put every register below Biber's mean and inflated Dimension 3.
 dtag_all_adverbs <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "_RB") & !d_grepl(x, "<"),
+  x[d_grepl_case(x, "_RB[RS]?(\\s|$)") & !d_grepl_case(x, "^(?i:not|n['\u2019]t)_"),
     x := d_sub(x, "$", " <RB>")]
   return(x$x)
 }
@@ -894,9 +899,14 @@ dtag_prepositions <- function(x) {
 }
 
 #' Tag time adverbials
+#' Biber (1988) list. "again", "now", "once" and "late" are counted only when
+#' tagged as adverbs, so conjunction "once" ("once you know") and adjective
+#' "late" ("the late president") are excluded. "then" and "already" are not
+#' on Biber's list.
 dtag_time_adverbials <- function(x) {
   x <- data.table(x)
-  x[d_grepl(x, "\\bafterwards_|\\bearly_|\\bearlier_|\\beventually_|\\bformerly_|\\bimmediately_|\\binitially_|\\blately_|\\blater_|\\boriginally_|\\bpreviously_|\\brecently_|\\bshortly_|\\bsoon_|\\bsubsequently_|\\btoday_|\\btomorrow_|\\btonight_|\\byesterday_"),
+  x[d_grepl_case(x, "^(?i:again|now|once|late)_RB") |
+      d_grepl(x, "\\bnowadays_|\\binstantly_|\\bmomentarily_|\\bpresently_|\\bsimultaneously_|\\bafterwards_|\\bearly_|\\bearlier_|\\beventually_|\\bformerly_|\\bimmediately_|\\binitially_|\\blately_|\\blater_|\\boriginally_|\\bpreviously_|\\brecently_|\\bshortly_|\\bsoon_|\\bsubsequently_|\\btoday_|\\btomorrow_|\\btonight_|\\byesterday_"),
     x := d_sub(x, "$", " <TIME>")]
   return(x$x)
 }
