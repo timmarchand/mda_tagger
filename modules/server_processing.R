@@ -149,7 +149,9 @@ processingServer <- function(id, data_module, paren_session = NULL) {
             }
 
             # Step 3: Count features
-            counts <- count_features(dtagged, per_n_words = input$normalize_per)
+            counts <- count_features(dtagged, per_n_words = input$normalize_per,
+                                     ttr_window = input$ttr_window %||% 400,
+                                     ttr_method = input$ttr_method %||% "first")
             rv$log_messages <- c(rv$log_messages, log_message(paste("  ✓ Counted", nrow(counts), "features")))
 
             # Step 4: Calculate dimensions
@@ -165,7 +167,8 @@ processingServer <- function(id, data_module, paren_session = NULL) {
                   n_words = counts$n_words[1],
                   tagged_text = paste(rv$tagged_texts[[doc_ids[i]]], collapse = " "),
                   .before = 1
-                )
+                ) %>%
+                bind_cols(ttr_columns(counts))
             } else {
               # If dims is not a data frame, create one manually
               results[[i]] <- tibble(
@@ -183,15 +186,16 @@ processingServer <- function(id, data_module, paren_session = NULL) {
 
             rv$log_messages <- c(rv$log_messages, log_message(paste("  ✅ Complete:", doc_ids[i])))
 
-          }, error = function(e) {
-
       }, error = function(e) {
+        # (The previous version had an empty first error handler, so errors
+        # were swallowed and the text silently dropped from the results.
+        # `<<-` is needed because this handler is a separate function.)
         rv$log_messages <- c(
           rv$log_messages,
           log_message(paste("  ❌ Error:", e$message))
         )
 
-        results[[i]] <- tibble(
+        results[[i]] <<- tibble(
           doc_id = doc_ids[i],
           metadata = metadata[i],
           n_words = NA,
@@ -212,6 +216,15 @@ processingServer <- function(id, data_module, paren_session = NULL) {
     # Combine results
     if (length(results) > 0) {
       rv$processed_data <- bind_rows(results)
+
+      # Short-text TTR handling (needs every text scored first)
+      rv$processed_data <- apply_ttr_policy(rv$processed_data,
+                                            short_policy = input$ttr_short %||% "include")
+      n_short <- sum(rv$processed_data$ttr_short %in% TRUE)
+      rv$log_messages <- c(rv$log_messages, log_message(paste0(
+        "TTR: ", input$ttr_method %||% "first", ", window ", input$ttr_window %||% 400,
+        " words; ", n_short, " text(s) shorter than the window, handled as '",
+        input$ttr_short %||% "include", "'")))
 
       # Save tagged_text before classification
       tagged_text_backup <- rv$processed_data$tagged_text

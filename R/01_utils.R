@@ -1102,15 +1102,23 @@ dtag_all <- function(x) {
 
 #' Calculate Average Word Length and Type-Token Ratio
 #'
-#' TTR follows Biber (1988): the number of different words in the first
-#' `ttr_window` words of the text (default 400), x 100. Computing it over the
-#' whole text makes it fall with text length and inflates Dimension 1.
-#' Punctuation tokens are excluded from both measures.
+#' TTR is measured on a fixed number of words (`ttr_window`, default 400,
+#' the sample size behind Biber's 1988 norm), in one of two ways:
+#'   "first" - Biber (1988): different words in the first `ttr_window` words
+#'   "mattr" - moving-average TTR: the mean TTR over every `ttr_window`-word
+#'             stretch of the text (Covington & McFall 2010)
+#' Both give values on the same scale as Biber's norm. A text shorter than
+#' `ttr_window` gets TTR on all its words and is flagged `ttr_short = TRUE`;
+#' how such texts enter Dimension 1 is decided later by apply_ttr_policy().
+#' Punctuation tokens are excluded from both AWL and TTR.
 #'
 #' @param tagged_text Character vector of tagged tokens
-#' @param ttr_window Number of words used for TTR (Biber: 400)
-#' @return List with AWL and TTR
-add_awl_ttr <- function(tagged_text, ttr_window = 400) {
+#' @param ttr_window Number of words per TTR sample (Biber: 400)
+#' @param ttr_method "first" or "mattr"
+#' @return List with AWL, TTR, ttr_words (words TTR is based on) and ttr_short
+add_awl_ttr <- function(tagged_text, ttr_window = 400, ttr_method = c("first", "mattr")) {
+
+  ttr_method <- match.arg(ttr_method)
 
   # Extract words: drop feature tags, then the final _POS suffix
   words <- gsub("<[^>]+>", "", tagged_text)
@@ -1120,15 +1128,54 @@ add_awl_ttr <- function(tagged_text, ttr_window = 400) {
   words <- words[grepl("[[:alnum:]]", words)]
 
   if (length(words) == 0) {
-    return(list(AWL = 0, TTR = 0))
+    return(list(AWL = 0, TTR = 0, ttr_words = 0L, ttr_short = TRUE))
   }
 
-  # Average Word Length
   awl <- mean(nchar(words))
+  w <- tolower(words)
+  n <- length(w)
 
-  # Type-Token Ratio over the first ttr_window words
-  ttr_words <- tolower(head(words, ttr_window))
-  ttr <- (length(unique(ttr_words)) / length(ttr_words)) * 100
+  if (n < ttr_window) {
+    # Short text: TTR on all available words (higher than a full-window TTR)
+    return(list(AWL = awl, TTR = length(unique(w)) / n * 100,
+                ttr_words = n, ttr_short = TRUE))
+  }
 
-  return(list(AWL = awl, TTR = ttr))
+  ttr <- if (ttr_method == "first") {
+    length(unique(w[seq_len(ttr_window)])) / ttr_window * 100
+  } else {
+    mattr(w, ttr_window)
+  }
+
+  list(AWL = awl, TTR = ttr, ttr_words = if (ttr_method == "first") ttr_window else n,
+       ttr_short = FALSE)
+}
+
+#' Moving-average type-token ratio, one pass with a running type count
+#'
+#' @param w Character vector of (lower-cased) words, length >= k
+#' @param k Window size
+#' @return MATTR x 100
+mattr <- function(w, k) {
+  n <- length(w)
+  id <- match(w, unique(w))
+  cnt <- integer(max(id))
+  types <- 0L
+  for (i in seq_len(k)) {
+    if (cnt[id[i]] == 0L) types <- types + 1L
+    cnt[id[i]] <- cnt[id[i]] + 1L
+  }
+  total <- as.numeric(types)
+  if (n > k) {
+    for (i in (k + 1):n) {
+      o <- id[i - k]
+      cnt[o] <- cnt[o] - 1L
+      if (cnt[o] == 0L) types <- types - 1L
+      a <- id[i]
+      if (cnt[a] == 0L) types <- types + 1L
+      cnt[a] <- cnt[a] + 1L
+      total <- total + types
+    }
+  }
+  total / (n - k + 1) / k * 100
 }

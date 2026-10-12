@@ -85,39 +85,42 @@ add_st_tags <- function(x,
 #' @param texts Character vector of texts to analyze
 #' @param doc_ids Character vector of document IDs
 #' @param metadata Character vector of metadata labels
-#' @param normalize_per Normalize feature counts per N words (default: 100)
+#' @param normalize_per Normalize feature counts per N words (default: 100;
+#'   biber_base norms are per 100 words, so keep 100 for dimension scores)
+#' @param deflated Drop features with Biber mean < 0.1 per 100 words
+#' @param ttr_window Words per TTR sample (Biber: 400)
+#' @param ttr_method "first" (Biber 1988) or "mattr"
+#' @param ttr_short How texts shorter than ttr_window enter Dimension 1:
+#'   "include", "exclude", "blank_d1" or "register_mean" (see apply_ttr_policy)
 #' @param progress_callback Optional function to call with progress updates
-#' @return Tibble with dimension scores and metadata
+#' @return Tibble with dimension scores, TTR details and metadata
 #' @export
-
 mda_analysis <- function(texts,
                          doc_ids = NULL,
                          metadata = NULL,
                          normalize_per = 100,
                          deflated = TRUE,
+                         ttr_window = 400,
+                         ttr_method = "first",
+                         ttr_short = "include",
                          progress_callback = NULL) {
 
   n_texts <- length(texts)
 
-  # Generate doc_ids if not provided
   if (is.null(doc_ids)) {
     doc_ids <- paste0("doc_", sprintf("%03d", 1:n_texts))
   }
-
-  # Generate metadata if not provided
   if (is.null(metadata)) {
     metadata <- rep("unknown", n_texts)
   }
 
-  # Check model is loaded
   if (!exists("udmodel", envir = .GlobalEnv)) {
     stop("UDPipe model not loaded. Run init_udpipe_model() first.")
   }
 
-  # Process each text
-  results <- list()
+  results <- vector("list", n_texts)
 
-  for (i in 1:n_texts) {
+  for (i in seq_len(n_texts)) {
 
     if (!is.null(progress_callback)) {
       progress_callback(i, n_texts, doc_ids[i])
@@ -125,62 +128,42 @@ mda_analysis <- function(texts,
       cat("Processing", i, "/", n_texts, ":", doc_ids[i], "\n")
     }
 
-    tryCatch({
+    # tryCatch returns the row, so an error yields an error row instead of
+    # being lost (the previous version assigned inside the handler, which
+    # had no effect, and returned after the first text)
+    results[[i]] <- tryCatch({
 
-      # Step 1: POS tagging
       tagged <- add_st_tags(texts[i])
-
-      # Step 2: Linguistic feature tagging
       dtagged <- dtag_all(tagged)
 
-      # Flatten tagged text for storage
-      tagged_text_flat <- paste(dtagged, collapse = " ")
+      counts <- count_features(dtagged, per_n_words = normalize_per,
+                               ttr_window = ttr_window, ttr_method = ttr_method)
+      dims <- calculate_dimensions(counts, deflated = deflated)
 
-      # Step 3: Count features
-      counts <- count_features(dtagged, per_n_words = normalize_per)
-      counts$doc_id <- doc_ids[i]
-
-      # Step 4: Calculate dimensions
-      dims <- calculate_dimensions(counts)
-      dims$doc_id <- doc_ids[i]
-      dims$metadata = metadata[i]
-      dims$n_words <- counts$n_words[1]
-      dims$tagged_text <- tagged_text_flat  # ← Add this line
-
-      results[[i]] <- dims
+      dims %>%
+        mutate(doc_id = doc_ids[i],
+               metadata = metadata[i],
+               n_words = counts$n_words[1],
+               tagged_text = paste(dtagged, collapse = " "),
+               .before = 1) %>%
+        bind_cols(ttr_columns(counts))
 
     }, error = function(e) {
       warning("Error processing ", doc_ids[i], ": ", e$message)
-      results[[i]] <- tibble(
-        doc_id = doc_ids[i],
-        metadata = metadata[i],
-        n_words = NA,
-        tagged_text = NA,  # ← Add this line
-        Dimension1 = NA,
-        Dimension2 = NA,
-        Dimension3 = NA,
-        Dimension4 = NA,
-        Dimension5 = NA,
-        status = paste("error:", e$message)
-      )
+      tibble(doc_id = doc_ids[i], metadata = metadata[i], n_words = NA,
+             tagged_text = NA, Dimension1 = NA, Dimension2 = NA, Dimension3 = NA,
+             Dimension4 = NA, Dimension5 = NA, status = paste("error:", e$message))
     })
+  }
 
-    # Combine results
-    results_df <- bind_rows(results)
+  results_df <- bind_rows(results)
+  results_df <- apply_ttr_policy(results_df, short_policy = ttr_short)
 
-    # Classify text types
-    if (nrow(results_df) > 0) {
-      results_df <- add_closest_text_type(results_df)[[1]]
-    }
+  if (nrow(results_df) > 0) {
+    results_df <- add_closest_text_type(results_df)[[1]]
+  }
 
-    # Ensure tagged_text column exists (add back if lost)
-    if (!"tagged_text" %in% names(results_df)) {
-      # Rebuild tagged_text column from results list
-      results_df$tagged_text <- map_chr(results, ~.x$tagged_text[1])
-    }
-
-    return(results_df)
-}
+  results_df
 }
 
 #' Batch process multiple documents with parallel support

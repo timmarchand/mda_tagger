@@ -121,7 +121,9 @@ exportServer <- function(id, processing_module) {
         core_cols  <- c("doc_id", "tagged_text", "metadata")
         extra_cols <- setdiff(names(data), c(core_cols, "text", "n_words",
                                              "Dimension1", "Dimension2", "Dimension3",
-                                             "Dimension4", "Dimension5", "closest_text_type"))
+                                             "Dimension4", "Dimension5", "closest_text_type",
+                                             "TTR", "ttr_method", "ttr_window", "ttr_words",
+                                             "ttr_short", "ttr_used", "ttr_note"))
 
         export_df <- tibble(
           doc_id      = data$doc_id,
@@ -233,7 +235,9 @@ exportServer <- function(id, processing_module) {
 
       standard_cols <- c("doc_id", "metadata", "n_words", "tagged_text", "text",
                          "Dimension1", "Dimension2", "Dimension3", "Dimension4",
-                         "Dimension5", "closest_text_type")
+                         "Dimension5", "closest_text_type",
+                         "TTR", "ttr_method", "ttr_window", "ttr_words", "ttr_short",
+                         "ttr_used", "ttr_note")
       extra_cols <- setdiff(names(processed_data), standard_cols)
 
       if (length(extra_cols) > 0) {
